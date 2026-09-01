@@ -1,4 +1,4 @@
-import { transactions } from '../data/apiData.js'
+import transactions from '../data/transactions.json' with { type: 'json' }
 
 export const getTransactions = (req, res) => {
   res.json({

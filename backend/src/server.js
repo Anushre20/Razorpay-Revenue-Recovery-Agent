@@ -6,6 +6,7 @@ import diagnosisRoutes from './routes/diagnosisRoutes.js'
 import recoveryRoutes from './routes/recoveryRoutes.js'
 import analyticsRoutes from './routes/analyticsRoutes.js'
 import auditRoutes from './routes/auditRoutes.js'
+import leakageRoutes from './routes/leakageRoutes.js'
 
 dotenv.config()
 
@@ -19,6 +20,7 @@ app.use('/api/diagnosis', diagnosisRoutes)
 app.use('/api/recovery', recoveryRoutes)
 app.use('/api/analytics', analyticsRoutes)
 app.use('/api/audit', auditRoutes)
+app.use('/api/leakage', leakageRoutes)
 
 app.get('/', (req, res) => {
   res.json({

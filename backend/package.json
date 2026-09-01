@@ -5,14 +5,15 @@
   "type": "module",
   "main": "src/server.js",
   "scripts": {
-  "start": "node src/server.js",
-  "dev": "nodemon src/server.js",
-  "generate-data": "node src/data/generateDataset.js"
-},
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "generate-data": "node src/data/generateDataset.js"
+  },
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^17.2.1",
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "razorpay": "^2.9.8"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"
