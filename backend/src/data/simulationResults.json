@@ -1,0 +1,65 @@
+[
+  {
+    "transactionId": "TXN-2847037",
+    "action": "Payment Link",
+    "finalAction": "Payment Link",
+    "status": "SIMULATED_RECOVERY",
+    "succeeded": true,
+    "originalAmount": 2199,
+    "recoveredAmount": 1865,
+    "recoverability": 72,
+    "riskScore": 30,
+    "failureReason": "Price Changed",
+    "timestamp": "2026-09-02T15:04:20.326Z"
+  },
+  {
+    "transactionId": "TXN-2847003",
+    "action": "Human Escalation",
+    "finalAction": "Human Escalation",
+    "status": "NOT_SUPPORTED",
+    "succeeded": false,
+    "originalAmount": 131289,
+    "recoveredAmount": 0,
+    "recoverability": 40,
+    "riskScore": 60,
+    "failureReason": "Card Declined",
+    "timestamp": "2026-09-02T15:04:31.116Z"
+  },
+  {
+    "transactionId": "TXN-2847020",
+    "action": "Payment Link",
+    "finalAction": "Human Escalation",
+    "status": "BLOCKED",
+    "succeeded": false,
+    "originalAmount": 80871,
+    "recoveredAmount": 0,
+    "recoverability": 68,
+    "riskScore": 29,
+    "failureReason": "Price Changed",
+    "timestamp": "2026-09-02T15:04:31.127Z",
+    "guardrails": {
+      "transactionId": "TXN-2847020",
+      "requestedAction": "Payment Link",
+      "passed": false,
+      "allowedAction": "Human Escalation",
+      "requiresApproval": true,
+      "failedGuardrails": [
+        {
+          "passed": false,
+          "guardrail": "Automatic Recovery Amount",
+          "reason": "Automatic recovery blocked because transaction amount ₹80871 exceeds the ₹25000 limit."
+        }
+      ],
+      "checks": {
+        "retryLimit": true,
+        "recoveryAmount": false,
+        "recoverability": true
+      },
+      "policy": {
+        "maxRetryAttempts": 3,
+        "maxAutomaticRecoveryAmount": 25000,
+        "minimumRecoverability": 30
+      }
+    }
+  }
+]

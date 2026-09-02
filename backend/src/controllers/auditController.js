@@ -1,10 +1,21 @@
-import { auditTrail, guardrails } from '../data/apiData.js'
+import { getAllAuditLogs, getAuditLogsByTxnId } from '../services/auditService.js'
+import { guardrails } from '../data/apiData.js'
 
 export const getAuditTrail = (req, res) => {
+  const logs = getAllAuditLogs()
   res.json({
     success: true,
-    count: auditTrail.length,
-    data: auditTrail,
+    count: logs.length,
+    data: logs,
+  })
+}
+
+export const getAuditByTxnId = (req, res) => {
+  const logs = getAuditLogsByTxnId(req.params.txnId)
+  res.json({
+    success: true,
+    count: logs.length,
+    data: logs,
   })
 }
 

@@ -1,0 +1,87 @@
+[
+  {
+    "auditId": "AUD-1788371727104-2bddz",
+    "timestamp": "2026-09-02T17:55:27.104Z",
+    "transactionId": "TXN-2847037",
+    "eventType": "AI_DECISION",
+    "action": "Payment Link",
+    "status": "DECIDED",
+    "details": {
+      "reason": "Customer shows sufficient recovery potential through an alternate payment flow",
+      "recoverability": 72,
+      "riskScore": 30,
+      "amount": 2199,
+      "failureReason": "Price Changed",
+      "requiresApproval": false
+    }
+  },
+  {
+    "auditId": "AUD-1788371736381-7ji1u",
+    "timestamp": "2026-09-02T17:55:36.381Z",
+    "transactionId": "TXN-2847020",
+    "eventType": "POLICY_CHECK",
+    "action": "Payment Link",
+    "status": "BLOCKED",
+    "details": {
+      "passed": false,
+      "allowedAction": "Human Escalation",
+      "requiresApproval": true,
+      "failedGuardrails": [
+        {
+          "passed": false,
+          "guardrail": "Automatic Recovery Amount",
+          "reason": "Automatic recovery blocked because transaction amount ₹80871 exceeds the ₹25000 limit."
+        }
+      ],
+      "checks": {
+        "retryLimit": true,
+        "recoveryAmount": false,
+        "recoverability": true
+      },
+      "policy": {
+        "maxRetryAttempts": 3,
+        "maxAutomaticRecoveryAmount": 25000,
+        "minimumRecoverability": 30
+      }
+    }
+  },
+  {
+    "auditId": "AUD-1788371744191-0ucjo",
+    "timestamp": "2026-09-02T17:55:44.191Z",
+    "transactionId": "TXN-2847037",
+    "eventType": "SIMULATION_RESULT",
+    "action": "Payment Link",
+    "status": "SIMULATED_RECOVERY",
+    "details": {
+      "succeeded": true,
+      "originalAmount": 2199,
+      "recoveredAmount": 1865,
+      "recoverability": 72,
+      "riskScore": 30,
+      "failureReason": "Price Changed",
+      "finalAction": "Payment Link"
+    }
+  },
+  {
+    "auditId": "AUD-1788372269622-ar2ym",
+    "timestamp": "2026-09-02T18:04:29.622Z",
+    "transactionId": "TXN-2847037",
+    "eventType": "ACTION_RESULT",
+    "action": "Unknown",
+    "status": "FAILED",
+    "details": {
+      "executed": false
+    }
+  },
+  {
+    "auditId": "AUD-1788372337103-3szju",
+    "timestamp": "2026-09-02T18:05:37.103Z",
+    "transactionId": "TXN-2847037",
+    "eventType": "ACTION_RESULT",
+    "action": "Unknown",
+    "status": "FAILED",
+    "details": {
+      "executed": false
+    }
+  }
+]
