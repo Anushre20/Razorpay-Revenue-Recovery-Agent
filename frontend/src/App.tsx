@@ -1,13 +1,18 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, CartesianGrid, Legend
 } from "recharts";
 import {
-  failedTransactions, merchants, recoveryChartData, aiDiagnoses,
-  recoveryActions, agentLogs, auditTrail, guardrails, blockedActions,
-  analyticsData, recoveryTypeData
-} from "./data/mockData";
+  type Transaction, type LeakageTransaction, type LeakageSummary,
+  type Diagnosis, type RecoveryAction as RecoveryActionType, type AgentLog,
+  type AuditLog, type AuditGuardrail, type AnalyticsSummary,
+  type DashboardData, type Merchant,
+  fetchTransactions, fetchLeakage, fetchDiagnosis, fetchRecoveryActions,
+  fetchAgentLogs, fetchAuditTrail, fetchAuditGuardrails, fetchAnalytics,
+  fetchDashboard, fetchMerchants
+} from "./api";
+
 
 type NavItem = "dashboard" | "leakage" | "diagnosis" | "actions" | "agent" | "guardrails" | "audit" | "analytics" | "merchants";
 
@@ -190,14 +195,104 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   );
 };
 
+function LoadingSpinner() {
+  return (
+    <div className="flex items-center justify-center py-16">
+      <div className="flex items-center gap-3">
+        <div className="w-5 h-5 border-2 border-[#2563EB] border-t-transparent rounded-full animate-spin" />
+        <span className="text-xs text-gray-400 font-mono">Loading...</span>
+      </div>
+    </div>
+  );
+}
+
+function ErrorMessage({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 gap-3">
+      <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center">
+        <span className="text-red-400 text-lg">!</span>
+      </div>
+      <p className="text-sm text-gray-400">{message}</p>
+      {onRetry && (
+        <button onClick={onRetry} className="px-3 py-1.5 bg-[#2563EB] text-white text-xs rounded-lg hover:bg-blue-600 transition-colors">
+          Retry
+        </button>
+      )}
+    </div>
+  );
+}
+
+function useApiData<T>(fetcher: () => Promise<T>, deps: unknown[] = []) {
+  const [data, setData] = useState<T | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await fetcher();
+      setData(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load data');
+    } finally {
+      setLoading(false);
+    }
+  }, deps);
+
+  useEffect(() => { load(); }, [load]);
+
+  return { data, loading, error, retry: load };
+}
+
 function DashboardView() {
+  const dashboard = useApiData(fetchDashboard);
+  const leakage = useApiData(fetchLeakage);
+  const dashboardData = dashboard.data?.data;
+  const leakageTxns = leakage.data?.data || [];
+  const leakageSummary = leakage.data?.summary;
+
+  if (dashboard.loading || leakage.loading) return <LoadingSpinner />;
+  if (dashboard.error || leakage.error) return <ErrorMessage message={dashboard.error || leakage.error || ''} onRetry={() => { dashboard.retry(); leakage.retry(); }} />;
+
+  const typeCounts = { failed: 0, abandoned: 0, subscription: 0 };
+  const typeAmounts = { failed: 0, abandoned: 0, subscription: 0 };
+  leakageTxns.forEach((t) => {
+    if (t.type === 'Failed Payment') { typeCounts.failed++; typeAmounts.failed += t.amount; }
+    else if (t.type === 'Abandoned Checkout') { typeCounts.abandoned++; typeAmounts.abandoned += t.amount; }
+    else if (t.type === 'Subscription Failure') { typeCounts.subscription++; typeAmounts.subscription += t.amount; }
+  });
+  const totalLeakage = typeAmounts.failed + typeAmounts.abandoned + typeAmounts.subscription || 1;
+
+  const failedPct = Math.round((typeAmounts.failed / totalLeakage) * 100);
+  const abandonedPct = Math.round((typeAmounts.abandoned / totalLeakage) * 100);
+  const subscriptionPct = Math.round((typeAmounts.subscription / totalLeakage) * 100);
+
+  const leakageTypeData = [
+    { name: "Failed Payments", value: typeAmounts.failed, fill: "#2563EB" },
+    { name: "Abandoned Checkouts", value: typeAmounts.abandoned, fill: "#7C3AED" },
+    { name: "Subscription Failures", value: typeAmounts.subscription, fill: "#0EA5E9" },
+  ];
+
+  const dailyMap: Record<string, { atRisk: number; recovered: number }> = {};
+  leakageTxns.forEach((t) => {
+    const day = t.timestamp ? new Date(t.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+    if (!day) return;
+    if (!dailyMap[day]) dailyMap[day] = { atRisk: 0, recovered: 0 };
+    dailyMap[day].atRisk += t.amount;
+    if (t.groundTruthRecoverable) dailyMap[day].recovered += t.groundTruthRecoveredAmount;
+  });
+  const recoveryChartData = Object.entries(dailyMap).map(([date, v]) => ({
+    date,
+    atRisk: v.atRisk,
+    recovered: v.recovered,
+  }));
+
   return (
     <div className="space-y-5 animate-fade-in">
-      <div className="grid grid-cols-4 gap-4">
-        <StatCard label="At Risk Today" value="₹18.7L" sub="186 transactions" delta="+4.2%" />
-        <StatCard label="Recovered Today" value="₹11.5L" sub="114 transactions" delta="+7.8%" accent />
-        <StatCard label="Recovery Rate" value="61.5%" sub="vs 58.2% benchmark" delta="+3.3%" />
-        <StatCard label="Avg Recovery Time" value="47 min" sub="Median: 32 min" delta="-12%" />
+      <div className="grid grid-cols-2 gap-4">
+        <StatCard label="At Risk Today" value={fmt(dashboardData?.totalAtRisk || 0)} sub={`${leakageSummary?.totalCases || 0} transactions`} delta="+4.2%" />
+        <StatCard label="Recovered Today" value={fmt(dashboardData?.totalRecovered || 0)} sub={`${dashboardData?.activeCases || 0} active`} accent delta="+7.8%" />
       </div>
 
       <div className="grid grid-cols-3 gap-4">
@@ -206,36 +301,36 @@ function DashboardView() {
             <p className="text-xs text-gray-500 uppercase tracking-wider font-medium">Failed Payments</p>
             <StatusBadge status="At Risk" />
           </div>
-          <p className="text-xl font-bold font-display text-white mt-2">₹7.8L</p>
-          <p className="text-xs text-gray-500 mb-3">78 transactions · Avg ₹10K</p>
+          <p className="text-xl font-bold font-display text-white mt-2">{fmt(typeAmounts.failed)}</p>
+          <p className="text-xs text-gray-500 mb-3">{typeCounts.failed} transactions · Avg {fmt(typeCounts.failed ? Math.round(typeAmounts.failed / typeCounts.failed) : 0)}</p>
           <div className="w-full h-1 bg-[#1E2D45] rounded-full">
-            <div className="h-full bg-red-500 rounded-full" style={{ width: "42%" }} />
+            <div className="h-full bg-red-500 rounded-full" style={{ width: `${failedPct}%` }} />
           </div>
-          <p className="text-[10px] text-gray-600 mt-1">42% of today's leakage</p>
+          <p className="text-[10px] text-gray-600 mt-1">{failedPct}% of today's leakage</p>
         </Card>
         <Card className="p-5">
           <div className="flex items-center justify-between mb-1">
             <p className="text-xs text-gray-500 uppercase tracking-wider font-medium">Abandoned Checkouts</p>
             <StatusBadge status="In Recovery" />
           </div>
-          <p className="text-xl font-bold font-display text-white mt-2">₹6.4L</p>
-          <p className="text-xs text-gray-500 mb-3">53 sessions · Avg ₹12K</p>
+          <p className="text-xl font-bold font-display text-white mt-2">{fmt(typeAmounts.abandoned)}</p>
+          <p className="text-xs text-gray-500 mb-3">{typeCounts.abandoned} sessions · Avg {fmt(typeCounts.abandoned ? Math.round(typeAmounts.abandoned / typeCounts.abandoned) : 0)}</p>
           <div className="w-full h-1 bg-[#1E2D45] rounded-full">
-            <div className="h-full bg-amber-500 rounded-full" style={{ width: "34%" }} />
+            <div className="h-full bg-amber-500 rounded-full" style={{ width: `${abandonedPct}%` }} />
           </div>
-          <p className="text-[10px] text-gray-600 mt-1">34% of today's leakage</p>
+          <p className="text-[10px] text-gray-600 mt-1">{abandonedPct}% of today's leakage</p>
         </Card>
         <Card className="p-5">
           <div className="flex items-center justify-between mb-1">
             <p className="text-xs text-gray-500 uppercase tracking-wider font-medium">Subscription Failures</p>
             <StatusBadge status="At Risk" />
           </div>
-          <p className="text-xl font-bold font-display text-white mt-2">₹4.5L</p>
-          <p className="text-xs text-gray-500 mb-3">55 renewals · Avg ₹8.2K</p>
+          <p className="text-xl font-bold font-display text-white mt-2">{fmt(typeAmounts.subscription)}</p>
+          <p className="text-xs text-gray-500 mb-3">{typeCounts.subscription} renewals · Avg {fmt(typeCounts.subscription ? Math.round(typeAmounts.subscription / typeCounts.subscription) : 0)}</p>
           <div className="w-full h-1 bg-[#1E2D45] rounded-full">
-            <div className="h-full bg-purple-500 rounded-full" style={{ width: "24%" }} />
+            <div className="h-full bg-purple-500 rounded-full" style={{ width: `${subscriptionPct}%` }} />
           </div>
-          <p className="text-[10px] text-gray-600 mt-1">24% of today's leakage</p>
+          <p className="text-[10px] text-gray-600 mt-1">{subscriptionPct}% of today's leakage</p>
         </Card>
       </div>
 
@@ -283,8 +378,8 @@ function DashboardView() {
           <p className="text-xs text-gray-500 mb-4">Distribution this week</p>
           <ResponsiveContainer width="100%" height={160}>
             <PieChart>
-              <Pie data={recoveryTypeData} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={3} dataKey="value">
-                {recoveryTypeData.map((entry, i) => (
+              <Pie data={leakageTypeData} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={3} dataKey="value">
+                {leakageTypeData.map((entry, i) => (
                   <Cell key={i} fill={entry.fill} />
                 ))}
               </Pie>
@@ -292,7 +387,7 @@ function DashboardView() {
             </PieChart>
           </ResponsiveContainer>
           <div className="space-y-2 mt-2">
-            {recoveryTypeData.map((d) => (
+            {leakageTypeData.map((d) => (
               <div key={d.name} className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full" style={{ background: d.fill }} />
@@ -322,14 +417,14 @@ function DashboardView() {
             </tr>
           </thead>
           <tbody>
-            {failedTransactions.slice(0, 5).map((t) => (
+            {leakageTxns.slice(0, 5).map((t) => (
               <tr key={t.id} className="table-row-hover border-b border-[#1E2D45]/50 cursor-pointer">
                 <td className="py-2.5 font-mono text-[11px] text-[#3B82F6]">{t.id}</td>
                 <td className="py-2.5 text-xs text-gray-200">{t.merchant}</td>
                 <td className="py-2.5 font-mono text-xs text-white">{fmt(t.amount)}</td>
                 <td className="py-2.5 text-[11px] text-gray-400">{t.failureReason}</td>
                 <td className="py-2.5"><RiskBar score={t.riskScore} /></td>
-                <td className="py-2.5"><StatusBadge status={t.status} /></td>
+                <td className="py-2.5"><StatusBadge status={t.leakageLevel || 'Low'} /></td>
               </tr>
             ))}
           </tbody>
@@ -342,23 +437,34 @@ function DashboardView() {
 function LeakageView() {
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
-  const categories = ["All", "Failed Payment", "Abandoned Checkout", "Subscription"];
+  const categories = ["All", "Failed Payment", "Abandoned Checkout", "Subscription Failure"];
 
-  const filtered = failedTransactions.filter((t) => {
-    const matchCat = filter === "All" || t.category === filter;
+  const { data, loading, error, retry } = useApiData(fetchLeakage);
+  const allTxns = data?.data || [];
+  const summary = data?.summary;
+
+  const filtered = allTxns.filter((t) => {
+    const matchCat = filter === "All" || t.type === filter || (filter === "Subscription" && t.type === "Subscription Failure");
     const matchSearch = t.merchant.toLowerCase().includes(search.toLowerCase()) ||
       t.customer.toLowerCase().includes(search.toLowerCase()) ||
       t.id.toLowerCase().includes(search.toLowerCase());
     return matchCat && matchSearch;
   });
 
+  const highRisk = allTxns.filter((t) => t.riskScore >= 80);
+  const highRiskAmount = highRisk.reduce((sum, t) => sum + t.amount, 0);
+  const avgRisk = allTxns.length ? Math.round(allTxns.reduce((sum, t) => sum + t.riskScore, 0) / allTxns.length) : 0;
+
+  if (loading) return <LoadingSpinner />;
+  if (error) return <ErrorMessage message={error} onRetry={retry} />;
+
   return (
     <div className="space-y-4 animate-fade-in">
       <div className="grid grid-cols-4 gap-4">
-        <StatCard label="Total At Risk" value="₹18.7L" sub="186 transactions" />
-        <StatCard label="High Risk (80+)" value="₹8.4L" sub="42 transactions" />
-        <StatCard label="In Recovery" value="₹5.2L" sub="58 transactions" />
-        <StatCard label="Avg Risk Score" value="68.4" sub="Across all open cases" />
+        <StatCard label="Total At Risk" value={fmt(summary?.totalAtRisk || 0)} sub={`${summary?.totalCases || allTxns.length} transactions`} />
+        <StatCard label="High Risk (80+)" value={fmt(highRiskAmount)} sub={`${highRisk.length} transactions`} />
+        <StatCard label="In Recovery" value={fmt(allTxns.filter(t => t.leakageLevel === 'High' || t.leakageLevel === 'Critical').reduce((s, t) => s + t.amount, 0))} sub={`${allTxns.filter(t => t.leakageLevel === 'High' || t.leakageLevel === 'Critical').length} transactions`} />
+        <StatCard label="Avg Risk Score" value={String(avgRisk)} sub="Across all open cases" />
       </div>
 
       <Card className="p-5">
@@ -406,13 +512,13 @@ function LeakageView() {
                   <td className="py-3 font-mono text-xs text-white font-medium">{fmtFull(t.amount)}</td>
                   <td className="py-3">
                     <span className="status-badge px-2 py-0.5 rounded-md text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                      {t.category}
+                      {t.type}
                     </span>
                   </td>
                   <td className="py-3 text-[11px] text-gray-400">{t.failureReason}</td>
                   <td className="py-3"><RiskBar score={t.riskScore} /></td>
-                  <td className="py-3"><StatusBadge status={t.status} /></td>
-                  <td className="py-3 text-[10px] text-gray-500 font-mono">{t.time}</td>
+                  <td className="py-3"><StatusBadge status={t.leakageLevel || 'Low'} /></td>
+                  <td className="py-3 text-[10px] text-gray-500 font-mono">{t.timestamp ? new Date(t.timestamp).toLocaleDateString() : ''}</td>
                 </tr>
               ))}
             </tbody>
@@ -425,18 +531,38 @@ function LeakageView() {
 }
 
 function DiagnosisView() {
-  const [selected, setSelected] = useState<string | null>("TXN-2847361");
-  const diagnosableTxns = failedTransactions.filter((t) => aiDiagnoses[t.id]);
-  const diag = selected ? aiDiagnoses[selected] : null;
-  const txn = selected ? failedTransactions.find((t) => t.id === selected) : null;
+  const [selected, setSelected] = useState<string | null>(null);
+  const { data: txnData, loading: txnLoading, error: txnError, retry: txnRetry } = useApiData(fetchTransactions);
+  const [diag, setDiag] = useState<Diagnosis | null>(null);
+  const [diagLoading, setDiagLoading] = useState(false);
+  const [diagError, setDiagError] = useState<string | null>(null);
+
+  const allTxns = txnData?.data || [];
+  const displayTxns = allTxns.slice(0, 20);
+
+  useEffect(() => {
+    if (!selected) { setDiag(null); return; }
+    let cancelled = false;
+    setDiagLoading(true);
+    setDiagError(null);
+    fetchDiagnosis(selected)
+      .then((res) => { if (!cancelled) { setDiag(res.data); setDiagLoading(false); } })
+      .catch((err) => { if (!cancelled) { setDiagError(err.message); setDiagLoading(false); } });
+    return () => { cancelled = true; };
+  }, [selected]);
+
+  const txn = selected ? allTxns.find((t) => t.id === selected) : null;
+
+  if (txnLoading) return <LoadingSpinner />;
+  if (txnError) return <ErrorMessage message={txnError} onRetry={txnRetry} />;
 
   return (
     <div className="grid grid-cols-5 gap-4 h-full animate-fade-in">
       <div className="col-span-2 space-y-2">
         <Card className="p-4">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Select Transaction</p>
-          <div className="space-y-2">
-            {diagnosableTxns.map((t) => (
+          <div className="space-y-2 max-h-[600px] overflow-y-auto">
+            {displayTxns.map((t) => (
               <button
                 key={t.id}
                 onClick={() => setSelected(t.id)}
@@ -444,7 +570,7 @@ function DiagnosisView() {
               >
                 <div className="flex items-center justify-between mb-1">
                   <span className="font-mono text-[11px] text-[#3B82F6]">{t.id}</span>
-                  <StatusBadge status={t.status} />
+                  <StatusBadge status={t.groundTruthRecoverable ? 'At Risk' : 'Recovered'} />
                 </div>
                 <p className="text-xs text-gray-200 font-medium">{t.merchant}</p>
                 <div className="flex items-center justify-between mt-1">
@@ -459,7 +585,11 @@ function DiagnosisView() {
       </div>
 
       <div className="col-span-3 space-y-4">
-        {diag && txn ? (
+        {diagLoading ? (
+          <Card className="p-8"><LoadingSpinner /></Card>
+        ) : diagError ? (
+          <Card className="p-8"><ErrorMessage message={diagError} /></Card>
+        ) : diag && txn ? (
           <>
             <Card className="p-5">
               <div className="flex items-center gap-2 mb-4">
@@ -489,7 +619,7 @@ function DiagnosisView() {
 
                 <div className="p-3.5 bg-[#1A2332] border border-[#1E2D45] rounded-lg">
                   <p className="text-[10px] text-gray-500 font-mono uppercase tracking-wider mb-1.5">Agent Reasoning</p>
-                  <p className="text-xs text-gray-400 font-mono leading-relaxed">{diag.agentReasoning}</p>
+                  <p className="text-xs text-gray-400 font-mono leading-relaxed">Payment method: {diag.analysis.paymentMethod} · Segment: {diag.analysis.customerSegment} · Prior successes: {diag.analysis.previousSuccessfulPayments} · Prior failures: {diag.analysis.previousFailedPayments}</p>
                 </div>
 
                 <div className="p-3.5 bg-[#2563EB]/10 border border-[#2563EB]/30 rounded-lg">
@@ -541,13 +671,23 @@ function DiagnosisView() {
 }
 
 function ActionsView() {
+  const { data, loading, error, retry } = useApiData(fetchRecoveryActions);
+  const actions = data?.data || [];
+
+  const executed = actions.filter(a => a.status === 'Executed').length;
+  const pending = actions.filter(a => a.status === 'Pending' || a.status === 'Pending Approval').length;
+  const stopped = actions.filter(a => a.status === 'Stopped' || a.status === 'Blocked').length;
+
+  if (loading) return <LoadingSpinner />;
+  if (error) return <ErrorMessage message={error} onRetry={retry} />;
+
   return (
     <div className="space-y-4 animate-fade-in">
       <div className="grid grid-cols-4 gap-4">
-        <StatCard label="Total Actions" value="7" sub="Today" />
-        <StatCard label="Executed" value="4" sub="Successfully dispatched" accent />
-        <StatCard label="Pending" value="2" sub="Awaiting response" />
-        <StatCard label="Stopped" value="1" sub="Blocked or escalated" />
+        <StatCard label="Total Actions" value={String(actions.length)} sub="Today" />
+        <StatCard label="Executed" value={String(executed)} sub="Successfully dispatched" accent />
+        <StatCard label="Pending" value={String(pending)} sub="Awaiting response" />
+        <StatCard label="Stopped" value={String(stopped)} sub="Blocked or escalated" />
       </div>
 
       <Card className="p-5">
@@ -561,7 +701,7 @@ function ActionsView() {
         </div>
 
         <div className="space-y-3">
-          {recoveryActions.map((a) => (
+          {actions.map((a) => (
             <div key={a.id} className="p-4 bg-[#1A2332] rounded-xl border border-[#1E2D45] hover:border-[#2563EB]/30 transition-all">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
@@ -580,8 +720,7 @@ function ActionsView() {
                   <p className="text-xs text-gray-400 mt-1">{a.reason}</p>
                 </div>
                 <div className="text-right ml-4">
-                  <p className="text-[10px] text-gray-500 font-mono">{a.time}</p>
-                  <p className={`text-[11px] mt-1 font-medium ${a.result.includes("RECOVERED") ? "text-emerald-400" : a.status === "Stopped" ? "text-red-400" : "text-gray-400"}`}>{a.result}</p>
+                  <p className={`text-[11px] mt-1 font-medium ${a.result?.includes("RECOVERED") ? "text-emerald-400" : a.status === "Stopped" ? "text-red-400" : "text-gray-400"}`}>{a.result || 'Awaiting response'}</p>
                 </div>
               </div>
             </div>
@@ -593,14 +732,19 @@ function ActionsView() {
 }
 
 function AgentView() {
-  const [logCount, setLogCount] = useState(agentLogs.length);
+  const { data: logsData, loading: logsLoading, error: logsError, retry: logsRetry } = useApiData(fetchAgentLogs);
+  const { data: analyticsDataRes } = useApiData(fetchAnalytics);
+  const logs = logsData?.data || [];
+  const analytics = analyticsDataRes?.data;
+
+  const [logCount, setLogCount] = useState(logs.length);
 
   useEffect(() => {
     const t = setInterval(() => {
-      setLogCount((c) => Math.min(c + 1, agentLogs.length + 3));
+      setLogCount((c) => Math.min(c + 1, logs.length + 3));
     }, 2000);
     return () => clearInterval(t);
-  }, []);
+  }, [logs.length]);
 
   const steps = [
     { id: "detect", label: "Detect", desc: "Signal ingestion", color: "text-blue-400", bg: "bg-blue-500/20 border-blue-500/30" },
@@ -612,14 +756,13 @@ function AgentView() {
     { id: "verify", label: "Verify", desc: "Outcome confirm", color: "text-teal-400", bg: "bg-teal-500/20 border-teal-500/30" },
   ];
 
-  const typeColors: Record<string, string> = {
-    DETECT: "text-blue-400", DIAGNOSE: "text-purple-400", DECIDE: "text-amber-400",
-    POLICY: "text-cyan-400", EXECUTE: "text-emerald-400", VERIFY: "text-teal-400",
+  const stageColors: Record<string, string> = {
+    Detect: "text-blue-400", Diagnose: "text-purple-400", Decide: "text-amber-400",
+    Policy: "text-cyan-400", Execute: "text-emerald-400", Verify: "text-teal-400",
   };
 
-  const levelColors: Record<string, string> = {
-    info: "text-gray-300", success: "text-emerald-300", warn: "text-amber-300", error: "text-red-300",
-  };
+  if (logsLoading) return <LoadingSpinner />;
+  if (logsError) return <ErrorMessage message={logsError} onRetry={logsRetry} />;
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -658,8 +801,8 @@ function AgentView() {
       </Card>
 
       <div className="grid grid-cols-3 gap-4">
-        <StatCard label="Processed Today" value="186" sub="Transactions analyzed" />
-        <StatCard label="Actions Dispatched" value="47" sub="Across all channels" accent />
+        <StatCard label="Processed Today" value={String(analytics?.successfulInterventions || logs.length)} sub="Transactions analyzed" />
+        <StatCard label="Actions Dispatched" value={String(analytics?.successfulInterventions || 0)} sub="Across all channels" accent />
         <StatCard label="Avg Decision Time" value="1.3s" sub="Per transaction" />
       </div>
 
@@ -675,18 +818,18 @@ function AgentView() {
           </div>
         </div>
         <div className="bg-[#090E1A] rounded-xl border border-[#1E2D45] p-4 space-y-2 max-h-72 overflow-y-auto font-mono">
-          {agentLogs.map((log) => (
+          {logs.map((log) => (
             <div key={log.id} className="flex items-start gap-3 text-[11px] animate-slide-in">
-              <span className="text-gray-600 flex-shrink-0">{log.time}</span>
-              <span className={`flex-shrink-0 font-bold w-16 ${typeColors[log.type] || "text-gray-400"}`}>[{log.type}]</span>
-              <span className={levelColors[log.level]}>{log.message}</span>
+              <span className="text-gray-600 flex-shrink-0">{log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : ''}</span>
+              <span className={`flex-shrink-0 font-bold w-16 ${stageColors[log.stage] || "text-gray-400"}`}>[{log.stage?.toUpperCase()}]</span>
+              <span className="text-gray-300">{log.message}</span>
             </div>
           ))}
-          {logCount > agentLogs.length && (
+          {logCount > logs.length && (
             <div className="flex items-start gap-3 text-[11px]">
-              <span className="text-gray-600">14:35:12</span>
+              <span className="text-gray-600">{new Date().toLocaleTimeString()}</span>
               <span className="text-blue-400 font-bold w-16">[DETECT]</span>
-              <span className="text-gray-300">Processing batch: 3 high-risk transactions queued...</span>
+              <span className="text-gray-300">Processing batch: high-risk transactions queued...</span>
             </div>
           )}
           <div className="flex items-center gap-1">
@@ -699,34 +842,38 @@ function AgentView() {
 }
 
 function GuardrailsView() {
-  const categories = [...new Set(guardrails.map((g) => g.category))];
+  const { data: guardrailsData, loading: gLoading, error: gError, retry: gRetry } = useApiData(fetchAuditGuardrails);
+  const { data: auditData } = useApiData(fetchAuditTrail);
+
+  const guardrailRules = guardrailsData?.data || [];
+  const auditLogs = auditData?.data || [];
+  const blockedLogs = auditLogs.filter(l => l.eventType === 'POLICY_CHECK' && l.status === 'BLOCKED');
+
+  const categories = [...new Set(guardrailRules.map((g) => g.name.split(' ')[0]))];
+
+  if (gLoading) return <LoadingSpinner />;
+  if (gError) return <ErrorMessage message={gError} onRetry={gRetry} />;
 
   return (
     <div className="space-y-4 animate-fade-in">
       <div className="grid grid-cols-4 gap-4">
-        <StatCard label="Active Rules" value="10" sub="All guardrails armed" />
-        <StatCard label="Triggered Today" value="9" sub="Rule enforcement events" />
-        <StatCard label="Blocked Actions" value="3" sub="Prevented by policy" />
-        <StatCard label="Escalations" value="1" sub="Sent to human review" />
+        <StatCard label="Active Rules" value={String(guardrailRules.length)} sub="All guardrails armed" />
+        <StatCard label="Triggered Today" value={String(auditLogs.filter(l => l.eventType === 'POLICY_CHECK').length)} sub="Rule enforcement events" />
+        <StatCard label="Blocked Actions" value={String(blockedLogs.length)} sub="Prevented by policy" />
+        <StatCard label="Escalations" value={String(auditLogs.filter(l => l.eventType === 'AI_DECISION' && l.action === 'Human Escalation').length)} sub="Sent to human review" />
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        {categories.map((cat) => (
-          <Card key={cat} className="p-5">
-            <p className="text-xs font-semibold text-gray-300 font-display mb-3">{cat}</p>
-            <div className="space-y-2.5">
-              {guardrails.filter((g) => g.category === cat).map((g) => (
-                <div key={g.id} className="p-3 bg-[#1A2332] rounded-lg border border-[#1E2D45]">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="font-mono text-[10px] text-gray-500">{g.id}</span>
-                    <StatusBadge status={g.status} />
-                  </div>
-                  <p className="text-[11px] text-gray-200 leading-relaxed">{g.rule}</p>
-                  {g.triggeredToday > 0 && (
-                    <p className="text-[10px] text-amber-400 mt-1.5 font-mono">↑ {g.triggeredToday}× triggered today</p>
-                  )}
-                </div>
-              ))}
+      <div className="grid grid-cols-2 gap-4">
+        {guardrailRules.map((g) => (
+          <Card key={g.id} className="p-5">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-semibold text-gray-300 font-display">{g.name}</p>
+              <StatusBadge status={g.status} />
+            </div>
+            <p className="text-[11px] text-gray-200 leading-relaxed mb-2">{g.description}</p>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-[10px] text-gray-500">{g.id}</span>
+              <span className="text-[10px] text-amber-400 font-mono">Limit: {g.limit.toLocaleString()}</span>
             </div>
           </Card>
         ))}
@@ -734,44 +881,54 @@ function GuardrailsView() {
 
       <Card className="p-5">
         <p className="text-sm font-semibold font-display text-white mb-4">Blocked Actions Today</p>
-        <table className="w-full">
-          <thead>
-            <tr className="text-[10px] text-gray-500 uppercase tracking-wider border-b border-[#1E2D45]">
-              <th className="text-left pb-2.5">ID</th>
-              <th className="text-left pb-2.5">Timestamp</th>
-              <th className="text-left pb-2.5">TXN ID</th>
-              <th className="text-left pb-2.5">Blocked Action</th>
-              <th className="text-left pb-2.5">Block Reason</th>
-              <th className="text-left pb-2.5">Guardrail</th>
-              <th className="text-left pb-2.5">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {blockedActions.map((b) => (
-              <tr key={b.id} className="table-row-hover border-b border-[#1E2D45]/40">
-                <td className="py-3 font-mono text-[11px] text-[#3B82F6]">{b.id}</td>
-                <td className="py-3 font-mono text-[10px] text-gray-500">{b.timestamp}</td>
-                <td className="py-3 font-mono text-[11px] text-gray-400">{b.txnId}</td>
-                <td className="py-3 text-xs text-gray-200">{b.blockedAction}</td>
-                <td className="py-3 text-[11px] text-gray-400">{b.blockReason}</td>
-                <td className="py-3 font-mono text-[11px] text-purple-400">{b.guardrail}</td>
-                <td className="py-3"><StatusBadge status={b.status} /></td>
+        {blockedLogs.length === 0 ? (
+          <p className="text-xs text-gray-500 py-4 text-center">No blocked actions recorded yet. Trigger guardrail checks to see blocked actions here.</p>
+        ) : (
+          <table className="w-full">
+            <thead>
+              <tr className="text-[10px] text-gray-500 uppercase tracking-wider border-b border-[#1E2D45]">
+                <th className="text-left pb-2.5">Audit ID</th>
+                <th className="text-left pb-2.5">Timestamp</th>
+                <th className="text-left pb-2.5">TXN ID</th>
+                <th className="text-left pb-2.5">Blocked Action</th>
+                <th className="text-left pb-2.5">Status</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {blockedLogs.map((b) => (
+                <tr key={b.auditId} className="table-row-hover border-b border-[#1E2D45]/40">
+                  <td className="py-3 font-mono text-[11px] text-[#3B82F6]">{b.auditId}</td>
+                  <td className="py-3 font-mono text-[10px] text-gray-500">{b.timestamp ? new Date(b.timestamp).toLocaleString() : ''}</td>
+                  <td className="py-3 font-mono text-[11px] text-gray-400">{b.transactionId}</td>
+                  <td className="py-3 text-xs text-gray-200">{b.action}</td>
+                  <td className="py-3"><StatusBadge status={b.status} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </Card>
     </div>
   );
 }
 
 function AuditView() {
+  const { data, loading, error, retry } = useApiData(fetchAuditTrail);
+  const logs = data?.data || [];
+
+  const aiDecisions = logs.filter(l => l.eventType === 'AI_DECISION').length;
+  const policyPasses = logs.filter(l => l.eventType === 'POLICY_CHECK' && l.status === 'PASSED').length;
+  const escalations = logs.filter(l => l.eventType === 'AI_DECISION' && l.action === 'Human Escalation').length;
+
+  if (loading) return <LoadingSpinner />;
+  if (error) return <ErrorMessage message={error} onRetry={retry} />;
+
   return (
     <div className="space-y-4 animate-fade-in">
       <div className="grid grid-cols-4 gap-4">
-        <StatCard label="Total Decisions" value="342" sub="AI-driven today" />
-        <StatCard label="Policy Passes" value="338" sub="98.8% compliance" accent />
-        <StatCard label="Escalations" value="3" sub="Sent to humans" />
+        <StatCard label="Total Decisions" value={String(aiDecisions || logs.length)} sub="AI-driven today" />
+        <StatCard label="Policy Passes" value={String(policyPasses)} sub={logs.length ? `${Math.round((policyPasses / Math.max(logs.filter(l => l.eventType === 'POLICY_CHECK').length, 1)) * 100)}% compliance` : 'No data'} accent />
+        <StatCard label="Escalations" value={String(escalations)} sub="Sent to humans" />
         <StatCard label="Avg Decision Time" value="1.3s" sub="End-to-end" />
       </div>
 
@@ -786,55 +943,115 @@ function AuditView() {
           </button>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="text-[10px] text-gray-500 uppercase tracking-wider border-b border-[#1E2D45]">
-                <th className="text-left pb-2.5">Audit ID</th>
-                <th className="text-left pb-2.5">Timestamp</th>
-                <th className="text-left pb-2.5">TXN ID</th>
-                <th className="text-left pb-2.5">AI Decision</th>
-                <th className="text-left pb-2.5">Reason</th>
-                <th className="text-left pb-2.5">Policy</th>
-                <th className="text-left pb-2.5">Action Taken</th>
-                <th className="text-left pb-2.5">Result</th>
-                <th className="text-left pb-2.5">Actor</th>
-              </tr>
-            </thead>
-            <tbody>
-              {auditTrail.map((a) => (
-                <tr key={a.id} className="table-row-hover border-b border-[#1E2D45]/40">
-                  <td className="py-3 font-mono text-[11px] text-[#3B82F6]">{a.id}</td>
-                  <td className="py-3 font-mono text-[10px] text-gray-500">{a.timestamp}</td>
-                  <td className="py-3 font-mono text-[11px] text-gray-400">{a.txnId}</td>
-                  <td className="py-3 text-[11px] text-gray-200 max-w-[140px] truncate">{a.aiDecision}</td>
-                  <td className="py-3 text-[10px] text-gray-400 max-w-[120px] truncate">{a.reason}</td>
-                  <td className="py-3"><StatusBadge status={a.policyCheck} /></td>
-                  <td className="py-3 text-[11px] text-gray-200">{a.action}</td>
-                  <td className="py-3">
-                    <span className={`text-[11px] font-medium ${a.result.includes("RECOVERED") ? "text-emerald-400" : "text-gray-400"}`}>{a.result}</span>
-                  </td>
-                  <td className="py-3">
-                    <span className={`font-mono text-[10px] ${a.actor === "AI Agent" ? "text-[#3B82F6]" : "text-amber-400"}`}>{a.actor}</span>
-                  </td>
+        {logs.length === 0 ? (
+          <p className="text-xs text-gray-500 py-8 text-center">No audit records yet. Trigger recovery decisions to generate audit logs.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="text-[10px] text-gray-500 uppercase tracking-wider border-b border-[#1E2D45]">
+                  <th className="text-left pb-2.5">Audit ID</th>
+                  <th className="text-left pb-2.5">Timestamp</th>
+                  <th className="text-left pb-2.5">TXN ID</th>
+                  <th className="text-left pb-2.5">Event Type</th>
+                  <th className="text-left pb-2.5">Action</th>
+                  <th className="text-left pb-2.5">Status</th>
+                  <th className="text-left pb-2.5">Details</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {logs.map((log) => (
+                  <tr key={log.auditId} className="table-row-hover border-b border-[#1E2D45]/40">
+                    <td className="py-3 font-mono text-[11px] text-[#3B82F6]">{log.auditId}</td>
+                    <td className="py-3 font-mono text-[10px] text-gray-500">{log.timestamp ? new Date(log.timestamp).toLocaleString() : ''}</td>
+                    <td className="py-3 font-mono text-[11px] text-gray-400">{log.transactionId}</td>
+                    <td className="py-3 text-[11px] text-gray-200">{log.eventType}</td>
+                    <td className="py-3 text-[11px] text-gray-200">{log.action}</td>
+                    <td className="py-3">
+                      <StatusBadge status={log.status} />
+                    </td>
+                    <td className="py-3 text-[10px] text-gray-400 max-w-[200px] truncate">
+                      {log.eventType === 'AI_DECISION' && (log.details as Record<string, unknown>)?.reason ? String((log.details as Record<string, unknown>).reason) :
+                       log.eventType === 'POLICY_CHECK' && (log.details as Record<string, unknown>)?.passed !== undefined ? ((log.details as Record<string, unknown>).passed ? 'Passed' : 'Blocked') :
+                       log.eventType === 'ACTION_RESULT' && (log.details as Record<string, unknown>)?.executed !== undefined ? ((log.details as Record<string, unknown>).executed ? 'Executed' : 'Failed') :
+                       log.eventType === 'SIMULATION_RESULT' && (log.details as Record<string, unknown>)?.succeeded !== undefined ? ((log.details as Record<string, unknown>).succeeded ? 'Success' : 'Failed') :
+                       '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
     </div>
   );
 }
 
 function AnalyticsView() {
+  const { data, loading, error, retry } = useApiData(fetchAnalytics);
+  const analytics = data?.data;
+  const { data: txnData, loading: txnLoading } = useApiData(fetchTransactions);
+  const txns = txnData?.data || [];
+
+  const dayOrder = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  const weeklyData = (() => {
+    const dayMap: Record<string, { atRisk: number; recovered: number }> = {};
+    txns.forEach((t) => {
+      const d = new Date(t.timestamp);
+      const day = dayOrder[d.getDay()];
+      if (!dayMap[day]) dayMap[day] = { atRisk: 0, recovered: 0 };
+      dayMap[day].atRisk += t.amount;
+      if (t.groundTruthRecoverable) dayMap[day].recovered += t.groundTruthRecoveredAmount;
+    });
+    return dayOrder.filter((d) => dayMap[d]).map((d) => ({ day: d, ...dayMap[d] }));
+  })();
+
+  const interventionsData = (() => {
+    const actionMap: Record<string, { count: number; success: number }> = {};
+    txns.forEach((t) => {
+      const action = t.groundTruthAction;
+      if (!action) return;
+      if (!actionMap[action]) actionMap[action] = { count: 0, success: 0 };
+      actionMap[action].count++;
+      if (t.groundTruthRecoverable) actionMap[action].success++;
+    });
+    return Object.entries(actionMap).map(([type, v]) => ({
+      type,
+      count: v.count,
+      success: v.success,
+      rate: v.count ? Math.round((v.success / v.count) * 100) : 0,
+    }));
+  })();
+
+  const recoveryTrendData = (() => {
+    const dateMap: Record<string, { atRisk: number; recovered: number }> = {};
+    txns.forEach((t) => {
+      const date = t.timestamp ? new Date(t.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+      if (!date) return;
+      if (!dateMap[date]) dateMap[date] = { atRisk: 0, recovered: 0 };
+      dateMap[date].atRisk += t.amount;
+      if (t.groundTruthRecoverable) dateMap[date].recovered += t.groundTruthRecoveredAmount;
+    });
+    return Object.entries(dateMap).map(([date, v]) => ({
+      date,
+      atRisk: v.atRisk,
+      recovered: v.recovered,
+      rate: v.atRisk ? Math.round((v.recovered / v.atRisk) * 1000) / 10 : 0,
+    }));
+  })();
+
+  if (loading || txnLoading) return <LoadingSpinner />;
+  if (error) return <ErrorMessage message={error} onRetry={retry} />;
+
   return (
     <div className="space-y-4 animate-fade-in">
       <div className="grid grid-cols-4 gap-4">
-        <StatCard label="Money At Risk" value="₹18.7L" sub="This week" delta="+4.2%" />
-        <StatCard label="Money Recovered" value="₹11.5L" sub="This week" delta="+7.8%" accent />
-        <StatCard label="Recovery Rate" value="61.5%" sub="Industry avg: 45%" delta="+3.3%" />
-        <StatCard label="Unnecessary Actions" value="4.2%" sub="False positive rate" delta="-0.8%" />
+        <StatCard label="Money At Risk" value={fmt(analytics?.totalAtRisk || 0)} sub="This week" delta="+4.2%" />
+        <StatCard label="Money Recovered" value={fmt(analytics?.totalRecovered || 0)} sub="This week" delta="+7.8%" accent />
+        <StatCard label="Recovery Rate" value={`${analytics?.recoveryRate || 0}%`} sub="Industry avg: 45%" delta="+3.3%" />
+        <StatCard label="Unnecessary Actions" value={analytics?.unnecessaryActions ? `${analytics.unnecessaryActions}` : '0'} sub="False positive actions" />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
@@ -842,7 +1059,7 @@ function AnalyticsView() {
           <p className="text-sm font-semibold font-display text-white mb-1">Weekly At-Risk vs Recovered</p>
           <p className="text-xs text-gray-500 mb-4">Daily comparison this week</p>
           <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={analyticsData.weekly} barCategoryGap="30%">
+            <BarChart data={weeklyData} barCategoryGap="30%">
               <XAxis dataKey="day" tick={{ fill: "#4B5563", fontSize: 10 }} axisLine={false} tickLine={false} />
               <YAxis tickFormatter={(v) => fmt(v)} tick={{ fill: "#4B5563", fontSize: 10 }} axisLine={false} tickLine={false} />
               <Tooltip content={<CustomTooltip />} />
@@ -856,7 +1073,7 @@ function AnalyticsView() {
           <p className="text-sm font-semibold font-display text-white mb-1">Intervention Performance</p>
           <p className="text-xs text-gray-500 mb-4">Success rate by recovery type</p>
           <div className="space-y-3">
-            {analyticsData.interventions.map((item) => (
+            {interventionsData.map((item) => (
               <div key={item.type}>
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-xs text-gray-300">{item.type}</span>
@@ -876,9 +1093,9 @@ function AnalyticsView() {
 
       <Card className="p-5">
         <p className="text-sm font-semibold font-display text-white mb-1">Successful Interventions</p>
-        <p className="text-xs text-gray-500 mb-4">1,084 total interventions this week</p>
+        <p className="text-xs text-gray-500 mb-4">{analytics?.successfulInterventions || 0} total interventions this week</p>
         <ResponsiveContainer width="100%" height={180}>
-          <LineChart data={recoveryChartData}>
+          <LineChart data={recoveryTrendData}>
             <CartesianGrid strokeDasharray="3 3" stroke="#1E2D45" />
             <XAxis dataKey="date" tick={{ fill: "#4B5563", fontSize: 10 }} axisLine={false} tickLine={false} />
             <YAxis tickFormatter={(v) => `${v}%`} tick={{ fill: "#4B5563", fontSize: 10 }} axisLine={false} tickLine={false} domain={[55, 70]} />
@@ -892,17 +1109,42 @@ function AnalyticsView() {
 }
 
 function MerchantsView() {
+  const { data, loading, error, retry } = useApiData(fetchMerchants);
+  const merchantsList = data?.data || [];
+
+  const merchantVisuals: Record<string, { logo: string; color: string; trend: string }> = {
+    UrbanKart: { logo: "U", color: "#EF4444", trend: "+12%" },
+    TechNova: { logo: "T", color: "#F59E0B", trend: "+8%" },
+    StreamBox: { logo: "S", color: "#10B981", trend: "+15%" },
+    "Zomato Foods Pvt Ltd": { logo: "Z", color: "#EF4444", trend: "+12%" },
+    "Flipkart Internet": { logo: "F", color: "#F59E0B", trend: "+8%" },
+    "Swiggy India": { logo: "S", color: "#10B981", trend: "+15%" },
+    "Groww Invest": { logo: "G", color: "#6366F1", trend: "-3%" },
+    "Byju's Learning": { logo: "B", color: "#EC4899", trend: "+22%" },
+    "Nykaa Fashion": { logo: "N", color: "#F97316", trend: "+5%" },
+  };
+
+  const enriched = merchantsList.map(m => ({
+    ...m,
+    logo: merchantVisuals[m.name]?.logo || m.name[0],
+    color: merchantVisuals[m.name]?.color || "#6366F1",
+    trend: merchantVisuals[m.name]?.trend || "+0%",
+  }));
+
+  if (loading) return <LoadingSpinner />;
+  if (error) return <ErrorMessage message={error} onRetry={retry} />;
+
   return (
     <div className="space-y-4 animate-fade-in">
       <div className="grid grid-cols-4 gap-4">
-        <StatCard label="Active Merchants" value="6" sub="With open cases" />
-        <StatCard label="Total At Risk" value="₹1.56Cr" sub="Across all merchants" />
-        <StatCard label="Total Recovered" value="₹1.01Cr" sub="This week" accent />
-        <StatCard label="Best Recovery" value="71%" sub="Byju's Learning" />
+        <StatCard label="Active Merchants" value={String(enriched.length)} sub="With open cases" />
+        <StatCard label="Total At Risk" value={fmt(enriched.reduce((s, m) => s + m.atRisk, 0))} sub="Across all merchants" />
+        <StatCard label="Total Recovered" value={fmt(enriched.reduce((s, m) => s + m.recovered, 0))} sub="This week" accent />
+        <StatCard label="Best Recovery" value={`${Math.max(...enriched.map(m => m.recoveryRate))}%`} sub={enriched.reduce((best, m) => m.recoveryRate > best.recoveryRate ? m : best, enriched[0])?.name || '—'} />
       </div>
 
       <div className="grid grid-cols-3 gap-4">
-        {merchants.map((m) => (
+        {enriched.map((m) => (
           <Card key={m.id} className="p-5 cursor-pointer">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white text-sm" style={{ background: m.color }}>
@@ -947,7 +1189,7 @@ function MerchantsView() {
       <Card className="p-5">
         <p className="text-sm font-semibold font-display text-white mb-4">Merchant Performance Comparison</p>
         <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={merchants} barCategoryGap="35%">
+          <BarChart data={enriched} barCategoryGap="35%">
             <XAxis dataKey="name" tick={{ fill: "#4B5563", fontSize: 9 }} axisLine={false} tickLine={false} tickFormatter={(v) => v.split(" ")[0]} />
             <YAxis tickFormatter={(v) => fmt(v)} tick={{ fill: "#4B5563", fontSize: 10 }} axisLine={false} tickLine={false} />
             <Tooltip formatter={(v: any) => fmtFull(v)} contentStyle={{ background: "#1A2332", border: "1px solid #1E2D45", borderRadius: 8, fontSize: 11 }} />
