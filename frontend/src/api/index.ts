@@ -270,3 +270,43 @@ export const fetchAuditGuardrails = () => apiGet<{ success: boolean; count: numb
 export const fetchAnalytics = () => apiGet<{ success: boolean; data: AnalyticsSummary }>('/api/analytics');
 export const fetchDashboard = () => apiGet<{ success: boolean; data: DashboardData }>('/api/analytics/dashboard');
 export const fetchMerchants = () => apiGet<{ success: boolean; count: number; data: Merchant[] }>('/api/analytics/merchants');
+
+// Evaluation
+export interface ActionMetric {
+  action: string;
+  count: number;
+  correct: number;
+  incorrect: number;
+  truePositives: number;
+  trueNegatives: number;
+  falsePositives: number;
+  falseNegatives: number;
+  totalAmount: number;
+  recoveredAmount: number;
+  blockedByGuardrails: number;
+}
+
+export interface EvaluationData {
+  totalTransactions: number;
+  totalDecisions: number;
+  totalAtRisk: number;
+  totalRecovered: number;
+  recoveryRate: number;
+  truePositives: number;
+  trueNegatives: number;
+  falsePositives: number;
+  falseNegatives: number;
+  precision: number;
+  recall: number;
+  f1Score: number;
+  falsePositiveRate: number;
+  correctDecisions: number;
+  correctActionCount: number;
+  incorrectActionCount: number;
+  actionAccuracy: number;
+  blockedByGuardrails: number;
+  requiresApprovalCount: number;
+  actionMetrics: ActionMetric[];
+}
+
+export const fetchEvaluation = () => apiGet<{ success: boolean; data: EvaluationData }>('/api/evaluation');

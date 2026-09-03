@@ -7,10 +7,12 @@ import {
   type Transaction, type LeakageTransaction, type LeakageSummary,
   type Diagnosis, type RecoveryAction as RecoveryActionType, type AgentLog,
   type AuditLog, type AuditGuardrail, type AnalyticsSummary,
-  type DashboardData, type Merchant,
+  type DashboardData, type Merchant, type RecoveryDecision, type GuardrailCheckResult, type SimulationResult,
+  type EvaluationData,
   fetchTransactions, fetchLeakage, fetchDiagnosis, fetchRecoveryActions,
+  fetchRecoveryDecision, fetchGuardrailCheck, simulateRecovery,
   fetchAgentLogs, fetchAuditTrail, fetchAuditGuardrails, fetchAnalytics,
-  fetchDashboard, fetchMerchants
+  fetchDashboard, fetchMerchants, executeRecovery, fetchEvaluation
 } from "./api";
 
 
@@ -23,6 +25,16 @@ const fmt = (n: number) => {
 };
 
 const fmtFull = (n: number) => `₹${n.toLocaleString("en-IN")}`;
+
+function filterByDateRange<T extends { timestamp: string }>(items: T[], days: number): T[] {
+  if (days === 0) {
+    const today = new Date().toDateString();
+    return items.filter((t) => new Date(t.timestamp).toDateString() === today);
+  }
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  return items.filter((t) => new Date(t.timestamp) >= cutoff);
+}
 
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
@@ -96,7 +108,11 @@ const navItems: { id: NavItem; label: string; icon: string }[] = [
   { id: "merchants", label: "Merchant View", icon: "🏪" },
 ];
 
-function Sidebar({ active, onNav }: { active: NavItem; onNav: (n: NavItem) => void }) {
+function Sidebar({ active, onNav, searchQuery, onSearchChange, onSearchSubmit, badgeCounts }: {
+  active: NavItem; onNav: (n: NavItem) => void;
+  searchQuery: string; onSearchChange: (q: string) => void; onSearchSubmit: () => void;
+  badgeCounts: { leakage: number; actions: number };
+}) {
   return (
     <aside className="w-56 flex-shrink-0 bg-[#090E1A] border-r border-[#1E2D45] flex flex-col h-full">
       <div className="px-5 py-5 border-b border-[#1E2D45]">
@@ -114,6 +130,9 @@ function Sidebar({ active, onNav }: { active: NavItem; onNav: (n: NavItem) => vo
       <div className="px-3 pt-4 pb-1">
         <div className="relative">
           <input
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') onSearchSubmit(); }}
             className="w-full bg-[#111827] border border-[#1E2D45] rounded-lg px-3 py-2 text-xs text-gray-300 placeholder-gray-600 focus:outline-none focus:border-[#2563EB] transition-colors"
             placeholder="Search transactions..."
           />
@@ -129,11 +148,11 @@ function Sidebar({ active, onNav }: { active: NavItem; onNav: (n: NavItem) => vo
           >
             <span className="text-sm w-4 text-center">{item.icon}</span>
             <span className="font-medium">{item.label}</span>
-            {item.id === "leakage" && (
-              <span className="ml-auto bg-red-500/20 text-red-400 text-[9px] font-mono px-1.5 py-0.5 rounded">12</span>
+            {item.id === "leakage" && badgeCounts.leakage > 0 && (
+              <span className="ml-auto bg-red-500/20 text-red-400 text-[9px] font-mono px-1.5 py-0.5 rounded">{badgeCounts.leakage}</span>
             )}
-            {item.id === "actions" && (
-              <span className="ml-auto bg-amber-500/20 text-amber-400 text-[9px] font-mono px-1.5 py-0.5 rounded">4</span>
+            {item.id === "actions" && badgeCounts.actions > 0 && (
+              <span className="ml-auto bg-amber-500/20 text-amber-400 text-[9px] font-mono px-1.5 py-0.5 rounded">{badgeCounts.actions}</span>
             )}
           </button>
         ))}
@@ -155,7 +174,7 @@ function Sidebar({ active, onNav }: { active: NavItem; onNav: (n: NavItem) => vo
   );
 }
 
-function TopBar({ title, sub }: { title: string; sub: string }) {
+function TopBar({ title, sub, dateRange, onDateRangeChange }: { title: string; sub: string; dateRange: string; onDateRangeChange: (v: string) => void }) {
   return (
     <div className="h-14 bg-[#090E1A]/80 backdrop-blur-sm border-b border-[#1E2D45] flex items-center justify-between px-6 flex-shrink-0">
       <div>
@@ -163,10 +182,10 @@ function TopBar({ title, sub }: { title: string; sub: string }) {
         <p className="text-[10px] text-gray-500">{sub}</p>
       </div>
       <div className="flex items-center gap-3">
-        <select className="bg-[#111827] border border-[#1E2D45] text-xs text-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#2563EB]">
-          <option>Last 7 days</option>
-          <option>Last 30 days</option>
-          <option>Today</option>
+        <select value={dateRange} onChange={(e) => onDateRangeChange(e.target.value)} className="bg-[#111827] border border-[#1E2D45] text-xs text-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#2563EB]">
+          <option value="7">Last 7 days</option>
+          <option value="30">Last 30 days</option>
+          <option value="0">Today</option>
         </select>
         <button className="relative p-2 rounded-lg bg-[#111827] border border-[#1E2D45] text-gray-400 hover:text-white transition-colors">
           <span className="text-sm">🔔</span>
@@ -245,11 +264,12 @@ function useApiData<T>(fetcher: () => Promise<T>, deps: unknown[] = []) {
   return { data, loading, error, retry: load };
 }
 
-function DashboardView() {
+function DashboardView({ onNavigate, dateRange }: { onNavigate: (n: NavItem) => void; dateRange: string }) {
   const dashboard = useApiData(fetchDashboard);
   const leakage = useApiData(fetchLeakage);
   const dashboardData = dashboard.data?.data;
-  const leakageTxns = leakage.data?.data || [];
+  const allLeakageTxns = leakage.data?.data || [];
+  const leakageTxns = filterByDateRange(allLeakageTxns, Number(dateRange));
   const leakageSummary = leakage.data?.summary;
 
   if (dashboard.loading || leakage.loading) return <LoadingSpinner />;
@@ -403,7 +423,7 @@ function DashboardView() {
       <Card className="p-5">
         <div className="flex items-center justify-between mb-4">
           <p className="text-sm font-semibold font-display text-white">Recent Failures</p>
-          <span className="text-[10px] text-[#3B82F6] cursor-pointer hover:text-blue-300">View all →</span>
+          <span onClick={() => onNavigate("leakage")} className="text-[10px] text-[#3B82F6] cursor-pointer hover:text-blue-300">View all →</span>
         </div>
         <table className="w-full">
           <thead>
@@ -418,7 +438,7 @@ function DashboardView() {
           </thead>
           <tbody>
             {leakageTxns.slice(0, 5).map((t) => (
-              <tr key={t.id} className="table-row-hover border-b border-[#1E2D45]/50 cursor-pointer">
+              <tr key={t.id} onClick={() => onNavigate("diagnosis")} className="table-row-hover border-b border-[#1E2D45]/50 cursor-pointer">
                 <td className="py-2.5 font-mono text-[11px] text-[#3B82F6]">{t.id}</td>
                 <td className="py-2.5 text-xs text-gray-200">{t.merchant}</td>
                 <td className="py-2.5 font-mono text-xs text-white">{fmt(t.amount)}</td>
@@ -434,16 +454,36 @@ function DashboardView() {
   );
 }
 
-function LeakageView() {
+function LeakageView({ onNavigate, dateRange }: { onNavigate: (n: NavItem) => void; dateRange: string }) {
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
   const categories = ["All", "Failed Payment", "Abandoned Checkout", "Subscription Failure"];
 
-  const { data, loading, error, retry } = useApiData(fetchLeakage);
-  const allTxns = data?.data || [];
-  const summary = data?.summary;
+  const [allTxns, setAllTxns] = useState<LeakageTransaction[]>([]);
+  const [summary, setSummary] = useState<LeakageSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const filtered = allTxns.filter((t) => {
+  const fetchLeakageData = useCallback(async (type?: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const params = type && type !== "All" ? { type } : undefined;
+      const res = await fetchLeakage(params);
+      setAllTxns(res.data || []);
+      setSummary(res.summary || null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load data');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchLeakageData(filter);
+  }, [filter, fetchLeakageData]);
+
+  const filtered = filterByDateRange(allTxns, Number(dateRange)).filter((t) => {
     const matchCat = filter === "All" || t.type === filter || (filter === "Subscription" && t.type === "Subscription Failure");
     const matchSearch = t.merchant.toLowerCase().includes(search.toLowerCase()) ||
       t.customer.toLowerCase().includes(search.toLowerCase()) ||
@@ -456,7 +496,7 @@ function LeakageView() {
   const avgRisk = allTxns.length ? Math.round(allTxns.reduce((sum, t) => sum + t.riskScore, 0) / allTxns.length) : 0;
 
   if (loading) return <LoadingSpinner />;
-  if (error) return <ErrorMessage message={error} onRetry={retry} />;
+  if (error) return <ErrorMessage message={error} onRetry={() => fetchLeakageData(filter)} />;
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -505,7 +545,7 @@ function LeakageView() {
             </thead>
             <tbody>
               {filtered.map((t) => (
-                <tr key={t.id} className="table-row-hover border-b border-[#1E2D45]/40 cursor-pointer group">
+                <tr key={t.id} onClick={() => onNavigate("diagnosis")} className="table-row-hover border-b border-[#1E2D45]/40 cursor-pointer group">
                   <td className="py-3 font-mono text-[11px] text-[#3B82F6] group-hover:text-blue-300">{t.id}</td>
                   <td className="py-3 text-xs text-gray-200">{t.merchant}</td>
                   <td className="py-3 text-xs text-gray-400">{t.customer}</td>
@@ -530,7 +570,204 @@ function LeakageView() {
   );
 }
 
-function DiagnosisView() {
+interface PipelineStage {
+  id: string;
+  label: string;
+  status: "pending" | "running" | "completed" | "blocked" | "failed";
+  result?: unknown;
+  error?: string;
+}
+
+function RecoveryPipeline({ txnId, recoverable, onComplete }: { txnId: string; recoverable: boolean; onComplete?: () => void }) {
+  const [stages, setStages] = useState<PipelineStage[]>([
+    { id: "diagnose", label: "Diagnose", status: "pending" },
+    { id: "decide", label: "Decide", status: "pending" },
+    { id: "policy", label: "Policy Check", status: "pending" },
+    { id: "execute", label: "Execute", status: "pending" },
+    { id: "recover", label: "Recover", status: "pending" },
+  ]);
+  const [running, setRunning] = useState(false);
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    setStages([
+      { id: "diagnose", label: "Diagnose", status: "pending" },
+      { id: "decide", label: "Decide", status: "pending" },
+      { id: "policy", label: "Policy Check", status: "pending" },
+      { id: "execute", label: "Execute", status: "pending" },
+      { id: "recover", label: "Recover", status: "pending" },
+    ]);
+    setRunning(false);
+    setDone(false);
+  }, [txnId]);
+
+  const updateStage = (id: string, patch: Partial<PipelineStage>) => {
+    setStages((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+  };
+
+  const runPipeline = async () => {
+    const currentTxnId = txnId;
+    setRunning(true);
+    setDone(false);
+    setStages([
+      { id: "diagnose", label: "Diagnose", status: "pending" },
+      { id: "decide", label: "Decide", status: "pending" },
+      { id: "policy", label: "Policy Check", status: "pending" },
+      { id: "execute", label: "Execute", status: "pending" },
+      { id: "recover", label: "Recover", status: "pending" },
+    ]);
+
+    try {
+      // Stage 1: Diagnose
+      updateStage("diagnose", { status: "running" });
+      const diagRes = await fetchDiagnosis(currentTxnId);
+      updateStage("diagnose", { status: "completed", result: diagRes.data });
+
+      // Stage 2: Decide
+      updateStage("decide", { status: "running" });
+      const decRes = await fetchRecoveryDecision(currentTxnId);
+      const decision = decRes.data;
+      updateStage("decide", { status: "completed", result: decision });
+
+      // Stage 3: Policy Check
+      updateStage("policy", { status: "running" });
+      const guardRes = await fetchGuardrailCheck(currentTxnId, decision.action);
+      const guard = guardRes.data;
+      updateStage("policy", { status: "completed", result: guard });
+
+      if (!guard.passed) {
+        updateStage("policy", { status: "blocked", result: guard, error: `Blocked: ${guard.failedGuardrails.map((f) => f.reason).join(", ")}` });
+        setRunning(false);
+        return;
+      }
+
+      if (guard.requiresApproval) {
+        updateStage("execute", { status: "blocked", error: "Requires approval — manual action needed" });
+        setRunning(false);
+        return;
+      }
+
+      // Stage 4: Execute
+      updateStage("execute", { status: "running" });
+      const execRes = await executeRecovery(currentTxnId);
+      const exec = execRes.data;
+      updateStage("execute", { status: "completed", result: exec });
+
+      if (!exec.executed) {
+        updateStage("recover", { status: "failed", error: exec.reason || "Execution failed" });
+        setRunning(false);
+        return;
+      }
+
+      // Stage 5: Recover (simulate outcome)
+      updateStage("recover", { status: "running" });
+      const simRes = await simulateRecovery(currentTxnId);
+      updateStage("recover", { status: "completed", result: simRes.data });
+
+      setDone(true);
+      onComplete?.();
+    } catch (err) {
+      const activeStage = stages.find((s) => s.status === "running");
+      if (activeStage) {
+        updateStage(activeStage.id, { status: "failed", error: err instanceof Error ? err.message : "Unknown error" });
+      }
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  const stageIcon = (s: PipelineStage) => {
+    if (s.status === "completed") return <span className="text-emerald-400">&#10003;</span>;
+    if (s.status === "blocked") return <span className="text-amber-400">&#9888;</span>;
+    if (s.status === "failed") return <span className="text-red-400">&#10007;</span>;
+    if (s.status === "running") return <span className="w-3 h-3 border-2 border-[#3B82F6] border-t-transparent rounded-full animate-spin inline-block" />;
+    return <span className="w-2 h-2 rounded-full bg-gray-600 inline-block" />;
+  };
+
+  const stageColor = (s: PipelineStage) => {
+    if (s.status === "completed") return "border-emerald-500/40 bg-emerald-500/10";
+    if (s.status === "blocked") return "border-amber-500/40 bg-amber-500/10";
+    if (s.status === "failed") return "border-red-500/40 bg-red-500/10";
+    if (s.status === "running") return "border-[#3B82F6]/40 bg-[#2563EB]/10";
+    return "border-[#1E2D45] bg-[#1A2332]";
+  };
+
+  return (
+    <Card className="p-5">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <p className="text-sm font-semibold font-display text-white">Live Recovery Pipeline</p>
+          <p className="text-[10px] text-gray-500 font-mono">{txnId}</p>
+        </div>
+        {!recoverable ? (
+          <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-1.5">
+            <span className="text-emerald-400">&#10003;</span>
+            <span className="text-[10px] text-emerald-400 font-mono font-medium">Already Recovered</span>
+          </div>
+        ) : (
+          <button
+            onClick={runPipeline}
+            disabled={running}
+            className="px-4 py-1.5 bg-[#2563EB] text-white text-[11px] font-medium rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {running && <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+            {running ? "Running..." : done ? "Run Again" : "Run Recovery"}
+          </button>
+        )}
+      </div>
+
+      {recoverable ? (
+        <>
+          <div className="flex items-center gap-2 mb-4">
+            {stages.map((s, i) => (
+              <div key={s.id} className="flex items-center flex-1">
+                <div className={`flex-1 border rounded-lg px-3 py-2.5 text-center transition-all ${stageColor(s)}`}>
+                  <div className="flex items-center justify-center gap-1.5 mb-1">
+                    {stageIcon(s)}
+                    <span className={`text-[11px] font-semibold font-display ${s.status === "completed" ? "text-emerald-400" : s.status === "blocked" ? "text-amber-400" : s.status === "failed" ? "text-red-400" : s.status === "running" ? "text-[#3B82F6]" : "text-gray-500"}`}>
+                      {s.label}
+                    </span>
+                  </div>
+                  {s.error && <p className="text-[9px] text-amber-400 mt-1 truncate" title={s.error}>{s.error.slice(0, 40)}...</p>}
+                </div>
+                {i < stages.length - 1 && (
+                  <div className="w-3 flex-shrink-0 flex items-center justify-center">
+                    <div className={`w-full h-px ${i < stages.findIndex((x) => x.status === "pending") ? "bg-emerald-500/50" : "bg-[#1E2D45]"}`} />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {stages.some((s) => s.result) && (
+            <div className="space-y-2">
+              {stages.filter((s) => s.result).map((s) => (
+                <details key={s.id} className="group">
+                  <summary className="cursor-pointer text-[11px] text-gray-400 hover:text-gray-200 flex items-center gap-2">
+                    <span className="group-open:rotate-90 transition-transform text-[10px]">&#9654;</span>
+                    {s.label} result
+                    <span className={`text-[9px] font-mono ${s.status === "completed" ? "text-emerald-400" : s.status === "blocked" ? "text-amber-400" : "text-red-400"}`}>
+                      {s.status}
+                    </span>
+                  </summary>
+                  <pre className="mt-2 p-3 bg-[#090E1A] rounded-lg border border-[#1E2D45] text-[10px] text-gray-400 overflow-x-auto max-h-48 overflow-y-auto">
+                    {JSON.stringify(s.result, null, 2)}
+                  </pre>
+                </details>
+              ))}
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="p-4 bg-emerald-500/8 border border-emerald-500/20 rounded-lg">
+          <p className="text-xs text-emerald-400 font-mono">This transaction has already been recovered. No further recovery action is required.</p>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function DiagnosisView({ searchQuery }: { searchQuery: string }) {
   const [selected, setSelected] = useState<string | null>(null);
   const { data: txnData, loading: txnLoading, error: txnError, retry: txnRetry } = useApiData(fetchTransactions);
   const [diag, setDiag] = useState<Diagnosis | null>(null);
@@ -539,6 +776,17 @@ function DiagnosisView() {
 
   const allTxns = txnData?.data || [];
   const displayTxns = allTxns.slice(0, 20);
+
+  useEffect(() => {
+    if (searchQuery && allTxns.length > 0) {
+      const match = allTxns.find((t) =>
+        t.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        t.merchant.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        t.customer.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      if (match) setSelected(match.id);
+    }
+  }, [searchQuery, allTxns]);
 
   useEffect(() => {
     if (!selected) { setDiag(null); return; }
@@ -659,6 +907,8 @@ function DiagnosisView() {
                 </div>
               </Card>
             </div>
+
+            {selected && <RecoveryPipeline txnId={selected} recoverable={txn?.groundTruthRecoverable ?? true} />}
           </>
         ) : (
           <Card className="p-8 flex items-center justify-center">
@@ -673,10 +923,33 @@ function DiagnosisView() {
 function ActionsView() {
   const { data, loading, error, retry } = useApiData(fetchRecoveryActions);
   const actions = data?.data || [];
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [executingId, setExecutingId] = useState<string | null>(null);
+  const [execError, setExecError] = useState<string | null>(null);
+
+  const filtered = statusFilter === "All" ? actions : actions.filter((a) => {
+    if (statusFilter === "Executed") return a.status === "Executed";
+    if (statusFilter === "Pending") return a.status === "Pending" || a.status === "Pending Approval";
+    if (statusFilter === "Stopped") return a.status === "Stopped" || a.status === "Blocked";
+    return true;
+  });
 
   const executed = actions.filter(a => a.status === 'Executed').length;
   const pending = actions.filter(a => a.status === 'Pending' || a.status === 'Pending Approval').length;
   const stopped = actions.filter(a => a.status === 'Stopped' || a.status === 'Blocked').length;
+
+  const handleExecute = async (txnId: string, actionId: string) => {
+    setExecutingId(actionId);
+    setExecError(null);
+    try {
+      await executeRecovery(txnId);
+      retry();
+    } catch (err) {
+      setExecError(err instanceof Error ? err.message : 'Execution failed');
+    } finally {
+      setExecutingId(null);
+    }
+  };
 
   if (loading) return <LoadingSpinner />;
   if (error) return <ErrorMessage message={error} onRetry={retry} />;
@@ -695,13 +968,17 @@ function ActionsView() {
           <p className="text-sm font-semibold font-display text-white">Recovery Actions</p>
           <div className="flex gap-2">
             {["All", "Executed", "Pending", "Stopped"].map((s) => (
-              <button key={s} className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-[#1A2332] text-gray-400 border border-[#1E2D45] hover:text-white transition-colors">{s}</button>
+              <button key={s} onClick={() => setStatusFilter(s)} className={`px-2.5 py-1 rounded-lg text-[10px] font-medium transition-colors ${statusFilter === s ? "bg-[#2563EB] text-white" : "bg-[#1A2332] text-gray-400 border border-[#1E2D45] hover:text-white"}`}>{s}</button>
             ))}
           </div>
         </div>
 
+        {execError && (
+          <div className="mb-3 p-2 bg-red-500/10 border border-red-500/20 rounded-lg text-[11px] text-red-400">{execError}</div>
+        )}
+
         <div className="space-y-3">
-          {actions.map((a) => (
+          {filtered.map((a) => (
             <div key={a.id} className="p-4 bg-[#1A2332] rounded-xl border border-[#1E2D45] hover:border-[#2563EB]/30 transition-all">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
@@ -719,8 +996,18 @@ function ActionsView() {
                   </div>
                   <p className="text-xs text-gray-400 mt-1">{a.reason}</p>
                 </div>
-                <div className="text-right ml-4">
+                <div className="text-right ml-4 flex flex-col items-end gap-2">
                   <p className={`text-[11px] mt-1 font-medium ${a.result?.includes("RECOVERED") ? "text-emerald-400" : a.status === "Stopped" ? "text-red-400" : "text-gray-400"}`}>{a.result || 'Awaiting response'}</p>
+                  {(a.status === "Pending" || a.status === "Pending Approval") && (
+                    <button
+                      onClick={() => handleExecute(a.txnId, a.id)}
+                      disabled={executingId === a.id}
+                      className="px-3 py-1 bg-[#2563EB] text-white text-[10px] rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                    >
+                      {executingId === a.id && <span className="w-2.5 h-2.5 border border-white border-t-transparent rounded-full animate-spin" />}
+                      Execute
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -736,15 +1023,6 @@ function AgentView() {
   const { data: analyticsDataRes } = useApiData(fetchAnalytics);
   const logs = logsData?.data || [];
   const analytics = analyticsDataRes?.data;
-
-  const [logCount, setLogCount] = useState(logs.length);
-
-  useEffect(() => {
-    const t = setInterval(() => {
-      setLogCount((c) => Math.min(c + 1, logs.length + 3));
-    }, 2000);
-    return () => clearInterval(t);
-  }, [logs.length]);
 
   const steps = [
     { id: "detect", label: "Detect", desc: "Signal ingestion", color: "text-blue-400", bg: "bg-blue-500/20 border-blue-500/30" },
@@ -825,13 +1103,6 @@ function AgentView() {
               <span className="text-gray-300">{log.message}</span>
             </div>
           ))}
-          {logCount > logs.length && (
-            <div className="flex items-start gap-3 text-[11px]">
-              <span className="text-gray-600">{new Date().toLocaleTimeString()}</span>
-              <span className="text-blue-400 font-bold w-16">[DETECT]</span>
-              <span className="text-gray-300">Processing batch: high-risk transactions queued...</span>
-            </div>
-          )}
           <div className="flex items-center gap-1">
             <span className="w-2 h-4 bg-[#2563EB] animate-pulse-dot inline-block rounded-sm" />
           </div>
@@ -915,10 +1186,36 @@ function GuardrailsView() {
 function AuditView() {
   const { data, loading, error, retry } = useApiData(fetchAuditTrail);
   const logs = data?.data || [];
+  const [search, setSearch] = useState("");
+
+  const filtered = search
+    ? logs.filter((l) => l.transactionId.toLowerCase().includes(search.toLowerCase()) || l.auditId.toLowerCase().includes(search.toLowerCase()))
+    : logs;
 
   const aiDecisions = logs.filter(l => l.eventType === 'AI_DECISION').length;
   const policyPasses = logs.filter(l => l.eventType === 'POLICY_CHECK' && l.status === 'PASSED').length;
   const escalations = logs.filter(l => l.eventType === 'AI_DECISION' && l.action === 'Human Escalation').length;
+
+  const handleExportCsv = () => {
+    if (filtered.length === 0) return;
+    const headers = ["Audit ID", "Timestamp", "TXN ID", "Event Type", "Action", "Status", "Details"];
+    const rows = filtered.map((l) => {
+      let details = '';
+      if (l.eventType === 'AI_DECISION' && (l.details as Record<string, unknown>)?.reason) details = String((l.details as Record<string, unknown>).reason);
+      else if (l.eventType === 'POLICY_CHECK' && (l.details as Record<string, unknown>)?.passed !== undefined) details = (l.details as Record<string, unknown>).passed ? 'Passed' : 'Blocked';
+      else if (l.eventType === 'ACTION_RESULT' && (l.details as Record<string, unknown>)?.executed !== undefined) details = (l.details as Record<string, unknown>).executed ? 'Executed' : 'Failed';
+      else if (l.eventType === 'SIMULATION_RESULT' && (l.details as Record<string, unknown>)?.succeeded !== undefined) details = (l.details as Record<string, unknown>).succeeded ? 'Success' : 'Failed';
+      return [l.auditId, l.timestamp ? new Date(l.timestamp).toLocaleString() : '', l.transactionId, l.eventType, l.action, l.status, details].join(',');
+    });
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'audit-trail.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   if (loading) return <LoadingSpinner />;
   if (error) return <ErrorMessage message={error} onRetry={retry} />;
@@ -938,13 +1235,23 @@ function AuditView() {
             <p className="text-sm font-semibold font-display text-white">Audit Trail</p>
             <p className="text-xs text-gray-500">Complete AI decision log with policy checks</p>
           </div>
-          <button className="px-3 py-1.5 bg-[#1A2332] border border-[#1E2D45] rounded-lg text-xs text-gray-400 hover:text-white transition-colors">
-            Export CSV
-          </button>
+          <div className="flex items-center gap-3">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="bg-[#1A2332] border border-[#1E2D45] rounded-lg px-3 py-1.5 text-xs text-gray-300 placeholder-gray-600 focus:outline-none focus:border-[#2563EB] w-52"
+              placeholder="Search by TXN or Audit ID..."
+            />
+            <button onClick={handleExportCsv} className="px-3 py-1.5 bg-[#1A2332] border border-[#1E2D45] rounded-lg text-xs text-gray-400 hover:text-white transition-colors">
+              Export CSV
+            </button>
+          </div>
         </div>
 
         {logs.length === 0 ? (
           <p className="text-xs text-gray-500 py-8 text-center">No audit records yet. Trigger recovery decisions to generate audit logs.</p>
+        ) : filtered.length === 0 ? (
+          <p className="text-xs text-gray-500 py-8 text-center">No records match your search.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -960,8 +1267,8 @@ function AuditView() {
                 </tr>
               </thead>
               <tbody>
-                {logs.map((log) => (
-                  <tr key={log.auditId} className="table-row-hover border-b border-[#1E2D45]/40">
+                {filtered.map((log) => (
+                  <tr key={log.auditId} onClick={() => setSearch(log.transactionId)} className="table-row-hover border-b border-[#1E2D45]/40 cursor-pointer">
                     <td className="py-3 font-mono text-[11px] text-[#3B82F6]">{log.auditId}</td>
                     <td className="py-3 font-mono text-[10px] text-gray-500">{log.timestamp ? new Date(log.timestamp).toLocaleString() : ''}</td>
                     <td className="py-3 font-mono text-[11px] text-gray-400">{log.transactionId}</td>
@@ -988,11 +1295,13 @@ function AuditView() {
   );
 }
 
-function AnalyticsView() {
+function AnalyticsView({ dateRange }: { dateRange: string }) {
   const { data, loading, error, retry } = useApiData(fetchAnalytics);
   const analytics = data?.data;
   const { data: txnData, loading: txnLoading } = useApiData(fetchTransactions);
-  const txns = txnData?.data || [];
+  const txns = filterByDateRange(txnData?.data || [], Number(dateRange));
+  const { data: evalData, loading: evalLoading } = useApiData(fetchEvaluation);
+  const evaluation = evalData?.data;
 
   const dayOrder = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -1104,6 +1413,98 @@ function AnalyticsView() {
           </LineChart>
         </ResponsiveContainer>
       </Card>
+
+      {evalLoading ? (
+        <Card className="p-5"><LoadingSpinner /></Card>
+      ) : evaluation ? (
+        <>
+          <Card className="p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-7 h-7 rounded-lg bg-[#2563EB]/20 flex items-center justify-center">
+                <span className="text-sm">&#128202;</span>
+              </div>
+              <div>
+                <p className="text-sm font-semibold font-display text-white">AI Evaluation</p>
+                <p className="text-[10px] text-gray-500 font-mono">{evaluation.totalDecisions} decisions evaluated across {evaluation.totalTransactions} transactions</p>
+              </div>
+            </div>
+          </Card>
+
+          <p className="text-[10px] text-gray-500 uppercase tracking-wider font-mono font-semibold">Business Outcome</p>
+          <div className="grid grid-cols-4 gap-4">
+            <StatCard label="Total At Risk" value={fmt(evaluation.totalAtRisk)} sub="Recoverable transactions" />
+            <StatCard label="Total Recovered" value={fmt(evaluation.totalRecovered)} sub="Ground truth recovered" accent />
+            <StatCard label="Recovery Rate" value={`${evaluation.recoveryRate}%`} sub="Recovered / At Risk" />
+            <StatCard label="Transactions" value={String(evaluation.totalTransactions)} sub="Total evaluated" />
+          </div>
+
+          <p className="text-[10px] text-gray-500 uppercase tracking-wider font-mono font-semibold">AI Decision Quality</p>
+          <div className="grid grid-cols-4 gap-4">
+            <StatCard label="Precision" value={`${evaluation.precision}%`} sub="TP / (TP + FP)" />
+            <StatCard label="Recall" value={`${evaluation.recall}%`} sub="TP / (TP + FN)" accent />
+            <StatCard label="F1 Score" value={`${evaluation.f1Score}%`} sub="Harmonic mean" />
+            <StatCard label="False Positive Rate" value={`${evaluation.falsePositiveRate}%`} sub="FP / (FP + TN)" />
+          </div>
+
+          <div className="grid grid-cols-4 gap-4">
+            <StatCard label="True Positives" value={String(evaluation.truePositives)} sub="Action + Recoverable" />
+            <StatCard label="True Negatives" value={String(evaluation.trueNegatives)} sub="No Action + Not Recoverable" />
+            <StatCard label="False Positives" value={String(evaluation.falsePositives)} sub="Action but Not Recoverable" />
+            <StatCard label="False Negatives" value={String(evaluation.falseNegatives)} sub="No Action but Recoverable" />
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <StatCard label="Correct Decisions" value={String(evaluation.correctDecisions)} sub="TP + TN" accent />
+            <StatCard label="Action Accuracy" value={`${evaluation.actionAccuracy}%`} sub="AI action vs ground truth" />
+            <StatCard label="Total Decisions" value={String(evaluation.totalDecisions)} sub="With comparable AI decisions" />
+          </div>
+
+          <p className="text-[10px] text-gray-500 uppercase tracking-wider font-mono font-semibold">Operational Execution</p>
+          <div className="grid grid-cols-3 gap-4">
+            <StatCard label="Blocked by Guardrails" value={String(evaluation.blockedByGuardrails)} sub="Policy prevented execution" />
+            <StatCard label="Requires Approval" value={String(evaluation.requiresApprovalCount)} sub="High-value / policy flag" />
+            <StatCard label="Action Breakdown" value={String(evaluation.actionMetrics.length)} sub="Unique AI actions used" />
+          </div>
+
+          <Card className="p-5">
+            <p className="text-sm font-semibold font-display text-white mb-4">Action-Level Evaluation</p>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="text-[10px] text-gray-500 uppercase tracking-wider border-b border-[#1E2D45]">
+                    <th className="text-left pb-2.5">Action</th>
+                    <th className="text-right pb-2.5">Count</th>
+                    <th className="text-right pb-2.5">Correct</th>
+                    <th className="text-right pb-2.5">Incorrect</th>
+                    <th className="text-right pb-2.5">TP</th>
+                    <th className="text-right pb-2.5">TN</th>
+                    <th className="text-right pb-2.5">FP</th>
+                    <th className="text-right pb-2.5">FN</th>
+                    <th className="text-right pb-2.5">Recovered</th>
+                    <th className="text-right pb-2.5">Blocked</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {evaluation.actionMetrics.map((am) => (
+                    <tr key={am.action} className="table-row-hover border-b border-[#1E2D45]/40">
+                      <td className="py-3 text-xs text-gray-200 font-medium">{am.action}</td>
+                      <td className="py-3 text-right font-mono text-[11px] text-gray-400">{am.count}</td>
+                      <td className="py-3 text-right font-mono text-[11px] text-emerald-400">{am.correct}</td>
+                      <td className="py-3 text-right font-mono text-[11px] text-red-400">{am.incorrect}</td>
+                      <td className="py-3 text-right font-mono text-[11px] text-gray-400">{am.truePositives}</td>
+                      <td className="py-3 text-right font-mono text-[11px] text-gray-400">{am.trueNegatives}</td>
+                      <td className="py-3 text-right font-mono text-[11px] text-amber-400">{am.falsePositives}</td>
+                      <td className="py-3 text-right font-mono text-[11px] text-amber-400">{am.falseNegatives}</td>
+                      <td className="py-3 text-right font-mono text-[11px] text-emerald-400">{fmt(am.recoveredAmount)}</td>
+                      <td className="py-3 text-right font-mono text-[11px] text-gray-400">{am.blockedByGuardrails}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </>
+      ) : null}
     </div>
   );
 }
@@ -1145,7 +1546,7 @@ function MerchantsView() {
 
       <div className="grid grid-cols-3 gap-4">
         {enriched.map((m) => (
-          <Card key={m.id} className="p-5 cursor-pointer">
+          <Card key={m.id} className="p-5">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white text-sm" style={{ background: m.color }}>
                 {m.logo}
@@ -1216,27 +1617,43 @@ const viewTitles: Record<NavItem, { title: string; sub: string }> = {
 
 export default function App() {
   const [view, setView] = useState<NavItem>("dashboard");
+  const [dateRange, setDateRange] = useState("7");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [leakageCount, setLeakageCount] = useState(0);
+  const [actionsCount, setActionsCount] = useState(0);
   const meta = viewTitles[view];
+
+  useEffect(() => {
+    fetchLeakage().then((res) => setLeakageCount(res.count || 0)).catch(() => {});
+    fetchRecoveryActions().then((res) => setActionsCount(res.count || 0)).catch(() => {});
+  }, []);
 
   const renderView = () => {
     switch (view) {
-      case "dashboard": return <DashboardView />;
-      case "leakage": return <LeakageView />;
-      case "diagnosis": return <DiagnosisView />;
+      case "dashboard": return <DashboardView onNavigate={setView} dateRange={dateRange} />;
+      case "leakage": return <LeakageView onNavigate={setView} dateRange={dateRange} />;
+      case "diagnosis": return <DiagnosisView searchQuery={searchQuery} />;
       case "actions": return <ActionsView />;
       case "agent": return <AgentView />;
       case "guardrails": return <GuardrailsView />;
       case "audit": return <AuditView />;
-      case "analytics": return <AnalyticsView />;
+      case "analytics": return <AnalyticsView dateRange={dateRange} />;
       case "merchants": return <MerchantsView />;
     }
   };
 
   return (
     <div className="flex h-full bg-[#0B1120] overflow-hidden">
-      <Sidebar active={view} onNav={setView} />
+      <Sidebar
+        active={view}
+        onNav={setView}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        onSearchSubmit={() => { setView("diagnosis"); }}
+        badgeCounts={{ leakage: leakageCount, actions: actionsCount }}
+      />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <TopBar title={meta.title} sub={meta.sub} />
+        <TopBar title={meta.title} sub={meta.sub} dateRange={dateRange} onDateRangeChange={setDateRange} />
         <main className="flex-1 overflow-y-auto p-5">
           {renderView()}
         </main>

@@ -83,5 +83,849 @@
     "details": {
       "executed": false
     }
+  },
+  {
+    "auditId": "AUD-1788437295997-w0wvl",
+    "timestamp": "2026-09-03T12:08:15.997Z",
+    "transactionId": "TXN-2847289",
+    "eventType": "ACTION_RESULT",
+    "action": "Human Escalation",
+    "status": "NOT_SUPPORTED",
+    "details": {
+      "executed": false,
+      "reason": "This recovery action does not have a Razorpay execution flow yet"
+    }
+  },
+  {
+    "auditId": "AUD-1788437306169-clhs6",
+    "timestamp": "2026-09-03T12:08:26.169Z",
+    "transactionId": "TXN-2847289",
+    "eventType": "ACTION_RESULT",
+    "action": "Human Escalation",
+    "status": "NOT_SUPPORTED",
+    "details": {
+      "executed": false,
+      "reason": "This recovery action does not have a Razorpay execution flow yet"
+    }
+  },
+  {
+    "auditId": "AUD-1788437315225-e0drh",
+    "timestamp": "2026-09-03T12:08:35.225Z",
+    "transactionId": "TXN-2847289",
+    "eventType": "ACTION_RESULT",
+    "action": "Human Escalation",
+    "status": "NOT_SUPPORTED",
+    "details": {
+      "executed": false,
+      "reason": "This recovery action does not have a Razorpay execution flow yet"
+    }
+  },
+  {
+    "auditId": "AUD-1788438869760-h05ce",
+    "timestamp": "2026-09-03T12:34:29.760Z",
+    "transactionId": "TXN-2847289",
+    "eventType": "ACTION_RESULT",
+    "action": "Human Escalation",
+    "status": "NOT_SUPPORTED",
+    "details": {
+      "executed": false,
+      "reason": "This recovery action does not have a Razorpay execution flow yet"
+    }
+  },
+  {
+    "auditId": "AUD-1788438882892-6er6c",
+    "timestamp": "2026-09-03T12:34:42.892Z",
+    "transactionId": "TXN-2847289",
+    "eventType": "ACTION_RESULT",
+    "action": "Human Escalation",
+    "status": "NOT_SUPPORTED",
+    "details": {
+      "executed": false,
+      "reason": "This recovery action does not have a Razorpay execution flow yet"
+    }
+  },
+  {
+    "auditId": "AUD-1788445179255-fttim",
+    "timestamp": "2026-09-03T14:19:39.255Z",
+    "transactionId": "TXN-2847361",
+    "eventType": "ACTION_RESULT",
+    "action": "No Action",
+    "status": "NOT_SUPPORTED",
+    "details": {
+      "executed": false,
+      "reason": "This recovery action does not have a Razorpay execution flow yet"
+    }
+  },
+  {
+    "auditId": "AUD-1788445281986-zagzg",
+    "timestamp": "2026-09-03T14:21:21.986Z",
+    "transactionId": "TXN-2847001",
+    "eventType": "AI_DECISION",
+    "action": "Human Escalation",
+    "status": "DECIDED",
+    "details": {
+      "reason": "Multiple payment attempts require human review",
+      "recoverability": 54,
+      "riskScore": 45,
+      "amount": 139331,
+      "failureReason": "Network Error",
+      "requiresApproval": true
+    }
+  },
+  {
+    "auditId": "AUD-1788445281992-fvv4z",
+    "timestamp": "2026-09-03T14:21:21.992Z",
+    "transactionId": "TXN-2847001",
+    "eventType": "POLICY_CHECK",
+    "action": "Human Escalation",
+    "status": "PASSED",
+    "details": {
+      "passed": true,
+      "allowedAction": "Human Escalation",
+      "requiresApproval": true,
+      "failedGuardrails": [],
+      "checks": {
+        "retryLimit": true,
+        "recoveryAmount": true,
+        "recoverability": true
+      },
+      "policy": {
+        "maxRetryAttempts": 3,
+        "maxAutomaticRecoveryAmount": 25000,
+        "minimumRecoverability": 30
+      }
+    }
+  },
+  {
+    "auditId": "AUD-1788445295085-c9tmh",
+    "timestamp": "2026-09-03T14:21:35.085Z",
+    "transactionId": "TXN-2847002",
+    "eventType": "AI_DECISION",
+    "action": "Human Escalation",
+    "status": "DECIDED",
+    "details": {
+      "reason": "Multiple payment attempts require human review",
+      "recoverability": 65,
+      "riskScore": 39,
+      "amount": 51007,
+      "failureReason": "Checkout Abandoned",
+      "requiresApproval": true
+    }
+  },
+  {
+    "auditId": "AUD-1788445295090-ybncb",
+    "timestamp": "2026-09-03T14:21:35.090Z",
+    "transactionId": "TXN-2847002",
+    "eventType": "POLICY_CHECK",
+    "action": "Human Escalation",
+    "status": "PASSED",
+    "details": {
+      "passed": true,
+      "allowedAction": "Human Escalation",
+      "requiresApproval": true,
+      "failedGuardrails": [],
+      "checks": {
+        "retryLimit": true,
+        "recoveryAmount": true,
+        "recoverability": true
+      },
+      "policy": {
+        "maxRetryAttempts": 3,
+        "maxAutomaticRecoveryAmount": 25000,
+        "minimumRecoverability": 30
+      }
+    }
+  },
+  {
+    "auditId": "AUD-1788445299937-8qrmi",
+    "timestamp": "2026-09-03T14:21:39.937Z",
+    "transactionId": "TXN-2847001",
+    "eventType": "AI_DECISION",
+    "action": "Human Escalation",
+    "status": "DECIDED",
+    "details": {
+      "reason": "Multiple payment attempts require human review",
+      "recoverability": 54,
+      "riskScore": 45,
+      "amount": 139331,
+      "failureReason": "Network Error",
+      "requiresApproval": true
+    }
+  },
+  {
+    "auditId": "AUD-1788445299942-ijpfy",
+    "timestamp": "2026-09-03T14:21:39.942Z",
+    "transactionId": "TXN-2847001",
+    "eventType": "POLICY_CHECK",
+    "action": "Human Escalation",
+    "status": "PASSED",
+    "details": {
+      "passed": true,
+      "allowedAction": "Human Escalation",
+      "requiresApproval": true,
+      "failedGuardrails": [],
+      "checks": {
+        "retryLimit": true,
+        "recoveryAmount": true,
+        "recoverability": true
+      },
+      "policy": {
+        "maxRetryAttempts": 3,
+        "maxAutomaticRecoveryAmount": 25000,
+        "minimumRecoverability": 30
+      }
+    }
+  },
+  {
+    "auditId": "AUD-1788445303219-lqdfc",
+    "timestamp": "2026-09-03T14:21:43.219Z",
+    "transactionId": "TXN-2847003",
+    "eventType": "AI_DECISION",
+    "action": "Human Escalation",
+    "status": "DECIDED",
+    "details": {
+      "reason": "Multiple payment attempts require human review",
+      "recoverability": 40,
+      "riskScore": 60,
+      "amount": 131289,
+      "failureReason": "Card Declined",
+      "requiresApproval": true
+    }
+  },
+  {
+    "auditId": "AUD-1788445303223-qp8rz",
+    "timestamp": "2026-09-03T14:21:43.223Z",
+    "transactionId": "TXN-2847003",
+    "eventType": "POLICY_CHECK",
+    "action": "Human Escalation",
+    "status": "PASSED",
+    "details": {
+      "passed": true,
+      "allowedAction": "Human Escalation",
+      "requiresApproval": true,
+      "failedGuardrails": [],
+      "checks": {
+        "retryLimit": true,
+        "recoveryAmount": true,
+        "recoverability": true
+      },
+      "policy": {
+        "maxRetryAttempts": 3,
+        "maxAutomaticRecoveryAmount": 25000,
+        "minimumRecoverability": 30
+      }
+    }
+  },
+  {
+    "auditId": "AUD-1788445308983-a336p",
+    "timestamp": "2026-09-03T14:21:48.983Z",
+    "transactionId": "TXN-2847004",
+    "eventType": "AI_DECISION",
+    "action": "No Action",
+    "status": "DECIDED",
+    "details": {
+      "reason": "Recovery potential is too low",
+      "recoverability": 27,
+      "riskScore": 74,
+      "amount": 63408,
+      "failureReason": "Payment Method Unavailable",
+      "requiresApproval": true
+    }
+  },
+  {
+    "auditId": "AUD-1788445308989-a6502",
+    "timestamp": "2026-09-03T14:21:48.989Z",
+    "transactionId": "TXN-2847004",
+    "eventType": "POLICY_CHECK",
+    "action": "No Action",
+    "status": "PASSED",
+    "details": {
+      "passed": true,
+      "allowedAction": "No Action",
+      "requiresApproval": true,
+      "failedGuardrails": [],
+      "checks": {
+        "retryLimit": true,
+        "recoveryAmount": true,
+        "recoverability": true
+      },
+      "policy": {
+        "maxRetryAttempts": 3,
+        "maxAutomaticRecoveryAmount": 25000,
+        "minimumRecoverability": 30
+      }
+    }
+  },
+  {
+    "auditId": "AUD-1788445312066-c1w18",
+    "timestamp": "2026-09-03T14:21:52.066Z",
+    "transactionId": "TXN-2847005",
+    "eventType": "AI_DECISION",
+    "action": "Human Escalation",
+    "status": "DECIDED",
+    "details": {
+      "reason": "Multiple payment attempts require human review",
+      "recoverability": 74,
+      "riskScore": 28,
+      "amount": 123786,
+      "failureReason": "Checkout Abandoned",
+      "requiresApproval": true
+    }
+  },
+  {
+    "auditId": "AUD-1788445312071-j6tpu",
+    "timestamp": "2026-09-03T14:21:52.071Z",
+    "transactionId": "TXN-2847005",
+    "eventType": "POLICY_CHECK",
+    "action": "Human Escalation",
+    "status": "PASSED",
+    "details": {
+      "passed": true,
+      "allowedAction": "Human Escalation",
+      "requiresApproval": true,
+      "failedGuardrails": [],
+      "checks": {
+        "retryLimit": true,
+        "recoveryAmount": true,
+        "recoverability": true
+      },
+      "policy": {
+        "maxRetryAttempts": 3,
+        "maxAutomaticRecoveryAmount": 25000,
+        "minimumRecoverability": 30
+      }
+    }
+  },
+  {
+    "auditId": "AUD-1788445315852-llhe7",
+    "timestamp": "2026-09-03T14:21:55.852Z",
+    "transactionId": "TXN-2847006",
+    "eventType": "AI_DECISION",
+    "action": "Human Escalation",
+    "status": "DECIDED",
+    "details": {
+      "reason": "High-value recovery requires human approval",
+      "recoverability": 98,
+      "riskScore": 2,
+      "amount": 30729,
+      "failureReason": "Insufficient Funds",
+      "requiresApproval": true
+    }
+  },
+  {
+    "auditId": "AUD-1788445315857-o2jop",
+    "timestamp": "2026-09-03T14:21:55.857Z",
+    "transactionId": "TXN-2847006",
+    "eventType": "POLICY_CHECK",
+    "action": "Human Escalation",
+    "status": "PASSED",
+    "details": {
+      "passed": true,
+      "allowedAction": "Human Escalation",
+      "requiresApproval": true,
+      "failedGuardrails": [],
+      "checks": {
+        "retryLimit": true,
+        "recoveryAmount": true,
+        "recoverability": true
+      },
+      "policy": {
+        "maxRetryAttempts": 3,
+        "maxAutomaticRecoveryAmount": 25000,
+        "minimumRecoverability": 30
+      }
+    }
+  },
+  {
+    "auditId": "AUD-1788445319851-owq6h",
+    "timestamp": "2026-09-03T14:21:59.851Z",
+    "transactionId": "TXN-2847007",
+    "eventType": "AI_DECISION",
+    "action": "Human Escalation",
+    "status": "DECIDED",
+    "details": {
+      "reason": "High-value recovery requires human approval",
+      "recoverability": 75,
+      "riskScore": 20,
+      "amount": 105650,
+      "failureReason": "Network Error",
+      "requiresApproval": true
+    }
+  },
+  {
+    "auditId": "AUD-1788445319856-3fiq4",
+    "timestamp": "2026-09-03T14:21:59.856Z",
+    "transactionId": "TXN-2847007",
+    "eventType": "POLICY_CHECK",
+    "action": "Human Escalation",
+    "status": "PASSED",
+    "details": {
+      "passed": true,
+      "allowedAction": "Human Escalation",
+      "requiresApproval": true,
+      "failedGuardrails": [],
+      "checks": {
+        "retryLimit": true,
+        "recoveryAmount": true,
+        "recoverability": true
+      },
+      "policy": {
+        "maxRetryAttempts": 3,
+        "maxAutomaticRecoveryAmount": 25000,
+        "minimumRecoverability": 30
+      }
+    }
+  },
+  {
+    "auditId": "AUD-1788445416752-pt8ul",
+    "timestamp": "2026-09-03T14:23:36.752Z",
+    "transactionId": "TXN-2847001",
+    "eventType": "AI_DECISION",
+    "action": "Human Escalation",
+    "status": "DECIDED",
+    "details": {
+      "reason": "Multiple payment attempts require human review",
+      "recoverability": 54,
+      "riskScore": 45,
+      "amount": 139331,
+      "failureReason": "Network Error",
+      "requiresApproval": true
+    }
+  },
+  {
+    "auditId": "AUD-1788445416758-c8k0a",
+    "timestamp": "2026-09-03T14:23:36.758Z",
+    "transactionId": "TXN-2847001",
+    "eventType": "POLICY_CHECK",
+    "action": "Human Escalation",
+    "status": "PASSED",
+    "details": {
+      "passed": true,
+      "allowedAction": "Human Escalation",
+      "requiresApproval": true,
+      "failedGuardrails": [],
+      "checks": {
+        "retryLimit": true,
+        "recoveryAmount": true,
+        "recoverability": true
+      },
+      "policy": {
+        "maxRetryAttempts": 3,
+        "maxAutomaticRecoveryAmount": 25000,
+        "minimumRecoverability": 30
+      }
+    }
+  },
+  {
+    "auditId": "AUD-1788445426961-9697y",
+    "timestamp": "2026-09-03T14:23:46.961Z",
+    "transactionId": "TXN-2847001",
+    "eventType": "AI_DECISION",
+    "action": "Human Escalation",
+    "status": "DECIDED",
+    "details": {
+      "reason": "Multiple payment attempts require human review",
+      "recoverability": 54,
+      "riskScore": 45,
+      "amount": 139331,
+      "failureReason": "Network Error",
+      "requiresApproval": true
+    }
+  },
+  {
+    "auditId": "AUD-1788445426967-ebejx",
+    "timestamp": "2026-09-03T14:23:46.967Z",
+    "transactionId": "TXN-2847001",
+    "eventType": "POLICY_CHECK",
+    "action": "Human Escalation",
+    "status": "PASSED",
+    "details": {
+      "passed": true,
+      "allowedAction": "Human Escalation",
+      "requiresApproval": true,
+      "failedGuardrails": [],
+      "checks": {
+        "retryLimit": true,
+        "recoveryAmount": true,
+        "recoverability": true
+      },
+      "policy": {
+        "maxRetryAttempts": 3,
+        "maxAutomaticRecoveryAmount": 25000,
+        "minimumRecoverability": 30
+      }
+    }
+  },
+  {
+    "auditId": "AUD-1788445433216-fqm05",
+    "timestamp": "2026-09-03T14:23:53.216Z",
+    "transactionId": "TXN-2847004",
+    "eventType": "AI_DECISION",
+    "action": "No Action",
+    "status": "DECIDED",
+    "details": {
+      "reason": "Recovery potential is too low",
+      "recoverability": 27,
+      "riskScore": 74,
+      "amount": 63408,
+      "failureReason": "Payment Method Unavailable",
+      "requiresApproval": true
+    }
+  },
+  {
+    "auditId": "AUD-1788445433220-aimv5",
+    "timestamp": "2026-09-03T14:23:53.220Z",
+    "transactionId": "TXN-2847004",
+    "eventType": "POLICY_CHECK",
+    "action": "No Action",
+    "status": "PASSED",
+    "details": {
+      "passed": true,
+      "allowedAction": "No Action",
+      "requiresApproval": true,
+      "failedGuardrails": [],
+      "checks": {
+        "retryLimit": true,
+        "recoveryAmount": true,
+        "recoverability": true
+      },
+      "policy": {
+        "maxRetryAttempts": 3,
+        "maxAutomaticRecoveryAmount": 25000,
+        "minimumRecoverability": 30
+      }
+    }
+  },
+  {
+    "auditId": "AUD-1788445436485-mgjtp",
+    "timestamp": "2026-09-03T14:23:56.485Z",
+    "transactionId": "TXN-2847002",
+    "eventType": "AI_DECISION",
+    "action": "Human Escalation",
+    "status": "DECIDED",
+    "details": {
+      "reason": "Multiple payment attempts require human review",
+      "recoverability": 65,
+      "riskScore": 39,
+      "amount": 51007,
+      "failureReason": "Checkout Abandoned",
+      "requiresApproval": true
+    }
+  },
+  {
+    "auditId": "AUD-1788445436491-jbntf",
+    "timestamp": "2026-09-03T14:23:56.491Z",
+    "transactionId": "TXN-2847002",
+    "eventType": "POLICY_CHECK",
+    "action": "Human Escalation",
+    "status": "PASSED",
+    "details": {
+      "passed": true,
+      "allowedAction": "Human Escalation",
+      "requiresApproval": true,
+      "failedGuardrails": [],
+      "checks": {
+        "retryLimit": true,
+        "recoveryAmount": true,
+        "recoverability": true
+      },
+      "policy": {
+        "maxRetryAttempts": 3,
+        "maxAutomaticRecoveryAmount": 25000,
+        "minimumRecoverability": 30
+      }
+    }
+  },
+  {
+    "auditId": "AUD-1788445501287-gh0vg",
+    "timestamp": "2026-09-03T14:25:01.288Z",
+    "transactionId": "TXN-2847005",
+    "eventType": "AI_DECISION",
+    "action": "Human Escalation",
+    "status": "DECIDED",
+    "details": {
+      "reason": "Multiple payment attempts require human review",
+      "recoverability": 74,
+      "riskScore": 28,
+      "amount": 123786,
+      "failureReason": "Checkout Abandoned",
+      "requiresApproval": true
+    }
+  },
+  {
+    "auditId": "AUD-1788445501294-pyy4a",
+    "timestamp": "2026-09-03T14:25:01.294Z",
+    "transactionId": "TXN-2847005",
+    "eventType": "POLICY_CHECK",
+    "action": "Human Escalation",
+    "status": "PASSED",
+    "details": {
+      "passed": true,
+      "allowedAction": "Human Escalation",
+      "requiresApproval": true,
+      "failedGuardrails": [],
+      "checks": {
+        "retryLimit": true,
+        "recoveryAmount": true,
+        "recoverability": true
+      },
+      "policy": {
+        "maxRetryAttempts": 3,
+        "maxAutomaticRecoveryAmount": 25000,
+        "minimumRecoverability": 30
+      }
+    }
+  },
+  {
+    "auditId": "AUD-1788445521620-ve855",
+    "timestamp": "2026-09-03T14:25:21.620Z",
+    "transactionId": "TXN-2847004",
+    "eventType": "AI_DECISION",
+    "action": "No Action",
+    "status": "DECIDED",
+    "details": {
+      "reason": "Recovery potential is too low",
+      "recoverability": 27,
+      "riskScore": 74,
+      "amount": 63408,
+      "failureReason": "Payment Method Unavailable",
+      "requiresApproval": true
+    }
+  },
+  {
+    "auditId": "AUD-1788445521626-uclm0",
+    "timestamp": "2026-09-03T14:25:21.626Z",
+    "transactionId": "TXN-2847004",
+    "eventType": "POLICY_CHECK",
+    "action": "No Action",
+    "status": "PASSED",
+    "details": {
+      "passed": true,
+      "allowedAction": "No Action",
+      "requiresApproval": true,
+      "failedGuardrails": [],
+      "checks": {
+        "retryLimit": true,
+        "recoveryAmount": true,
+        "recoverability": true
+      },
+      "policy": {
+        "maxRetryAttempts": 3,
+        "maxAutomaticRecoveryAmount": 25000,
+        "minimumRecoverability": 30
+      }
+    }
+  },
+  {
+    "auditId": "AUD-1788446457879-1bk3l",
+    "timestamp": "2026-09-03T14:40:57.879Z",
+    "transactionId": "TXN-2847001",
+    "eventType": "AI_DECISION",
+    "action": "Human Escalation",
+    "status": "DECIDED",
+    "details": {
+      "reason": "Multiple payment attempts require human review",
+      "recoverability": 54,
+      "riskScore": 45,
+      "amount": 139331,
+      "failureReason": "Network Error",
+      "requiresApproval": true
+    }
+  },
+  {
+    "auditId": "AUD-1788446457893-gjt8a",
+    "timestamp": "2026-09-03T14:40:57.893Z",
+    "transactionId": "TXN-2847001",
+    "eventType": "POLICY_CHECK",
+    "action": "Human Escalation",
+    "status": "PASSED",
+    "details": {
+      "passed": true,
+      "allowedAction": "Human Escalation",
+      "requiresApproval": true,
+      "failedGuardrails": [],
+      "checks": {
+        "retryLimit": true,
+        "recoveryAmount": true,
+        "recoverability": true
+      },
+      "policy": {
+        "maxRetryAttempts": 3,
+        "maxAutomaticRecoveryAmount": 25000,
+        "minimumRecoverability": 30
+      }
+    }
+  },
+  {
+    "auditId": "AUD-1788446597198-g81vv",
+    "timestamp": "2026-09-03T14:43:17.198Z",
+    "transactionId": "TXN-2847010",
+    "eventType": "AI_DECISION",
+    "action": "Human Escalation",
+    "status": "DECIDED",
+    "details": {
+      "reason": "Multiple payment attempts require human review",
+      "recoverability": 71,
+      "riskScore": 27,
+      "amount": 2630,
+      "failureReason": "Expired Card",
+      "requiresApproval": false
+    }
+  },
+  {
+    "auditId": "AUD-1788446597208-qulab",
+    "timestamp": "2026-09-03T14:43:17.208Z",
+    "transactionId": "TXN-2847010",
+    "eventType": "POLICY_CHECK",
+    "action": "Human Escalation",
+    "status": "PASSED",
+    "details": {
+      "passed": true,
+      "allowedAction": "Human Escalation",
+      "requiresApproval": false,
+      "failedGuardrails": [],
+      "checks": {
+        "retryLimit": true,
+        "recoveryAmount": true,
+        "recoverability": true
+      },
+      "policy": {
+        "maxRetryAttempts": 3,
+        "maxAutomaticRecoveryAmount": 25000,
+        "minimumRecoverability": 30
+      }
+    }
+  },
+  {
+    "auditId": "AUD-1788446597238-kibaa",
+    "timestamp": "2026-09-03T14:43:17.238Z",
+    "transactionId": "TXN-2847010",
+    "eventType": "ACTION_RESULT",
+    "action": "Human Escalation",
+    "status": "NOT_SUPPORTED",
+    "details": {
+      "executed": false,
+      "reason": "This recovery action does not have a Razorpay execution flow yet"
+    }
+  },
+  {
+    "auditId": "AUD-1788446609127-oobsl",
+    "timestamp": "2026-09-03T14:43:29.127Z",
+    "transactionId": "TXN-2847005",
+    "eventType": "AI_DECISION",
+    "action": "Human Escalation",
+    "status": "DECIDED",
+    "details": {
+      "reason": "Multiple payment attempts require human review",
+      "recoverability": 74,
+      "riskScore": 28,
+      "amount": 123786,
+      "failureReason": "Checkout Abandoned",
+      "requiresApproval": true
+    }
+  },
+  {
+    "auditId": "AUD-1788446609132-oc59p",
+    "timestamp": "2026-09-03T14:43:29.132Z",
+    "transactionId": "TXN-2847005",
+    "eventType": "POLICY_CHECK",
+    "action": "Human Escalation",
+    "status": "PASSED",
+    "details": {
+      "passed": true,
+      "allowedAction": "Human Escalation",
+      "requiresApproval": true,
+      "failedGuardrails": [],
+      "checks": {
+        "retryLimit": true,
+        "recoveryAmount": true,
+        "recoverability": true
+      },
+      "policy": {
+        "maxRetryAttempts": 3,
+        "maxAutomaticRecoveryAmount": 25000,
+        "minimumRecoverability": 30
+      }
+    }
+  },
+  {
+    "auditId": "AUD-1788446618099-pnplc",
+    "timestamp": "2026-09-03T14:43:38.099Z",
+    "transactionId": "TXN-2847001",
+    "eventType": "AI_DECISION",
+    "action": "Human Escalation",
+    "status": "DECIDED",
+    "details": {
+      "reason": "Multiple payment attempts require human review",
+      "recoverability": 54,
+      "riskScore": 45,
+      "amount": 139331,
+      "failureReason": "Network Error",
+      "requiresApproval": true
+    }
+  },
+  {
+    "auditId": "AUD-1788446618106-c8yvk",
+    "timestamp": "2026-09-03T14:43:38.106Z",
+    "transactionId": "TXN-2847001",
+    "eventType": "POLICY_CHECK",
+    "action": "Human Escalation",
+    "status": "PASSED",
+    "details": {
+      "passed": true,
+      "allowedAction": "Human Escalation",
+      "requiresApproval": true,
+      "failedGuardrails": [],
+      "checks": {
+        "retryLimit": true,
+        "recoveryAmount": true,
+        "recoverability": true
+      },
+      "policy": {
+        "maxRetryAttempts": 3,
+        "maxAutomaticRecoveryAmount": 25000,
+        "minimumRecoverability": 30
+      }
+    }
+  },
+  {
+    "auditId": "AUD-1788446622399-xr79j",
+    "timestamp": "2026-09-03T14:43:42.399Z",
+    "transactionId": "TXN-2847002",
+    "eventType": "AI_DECISION",
+    "action": "Human Escalation",
+    "status": "DECIDED",
+    "details": {
+      "reason": "Multiple payment attempts require human review",
+      "recoverability": 65,
+      "riskScore": 39,
+      "amount": 51007,
+      "failureReason": "Checkout Abandoned",
+      "requiresApproval": true
+    }
+  },
+  {
+    "auditId": "AUD-1788446622407-uuu0r",
+    "timestamp": "2026-09-03T14:43:42.407Z",
+    "transactionId": "TXN-2847002",
+    "eventType": "POLICY_CHECK",
+    "action": "Human Escalation",
+    "status": "PASSED",
+    "details": {
+      "passed": true,
+      "allowedAction": "Human Escalation",
+      "requiresApproval": true,
+      "failedGuardrails": [],
+      "checks": {
+        "retryLimit": true,
+        "recoveryAmount": true,
+        "recoverability": true
+      },
+      "policy": {
+        "maxRetryAttempts": 3,
+        "maxAutomaticRecoveryAmount": 25000,
+        "minimumRecoverability": 30
+      }
+    }
   }
 ]
