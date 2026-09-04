@@ -174,7 +174,7 @@ function Sidebar({ active, onNav, searchQuery, onSearchChange, onSearchSubmit, b
             <span className="text-white text-xs font-bold">A</span>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-white truncate">Aryan Kapoor</p>
+            <p className="text-xs font-medium text-white truncate">Anupama</p>
             <p className="text-[10px] text-gray-500">Risk Ops Lead</p>
           </div>
           <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse-dot" />
