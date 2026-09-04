@@ -8,6 +8,7 @@ import analyticsRoutes from './routes/analyticsRoutes.js'
 import auditRoutes from './routes/auditRoutes.js'
 import leakageRoutes from './routes/leakageRoutes.js'
 import evaluationRoutes from './routes/evaluationRoutes.js'
+import integrationRoutes from './routes/integrationRoutes.js'
 
 dotenv.config()
 
@@ -23,6 +24,7 @@ app.use('/api/analytics', analyticsRoutes)
 app.use('/api/audit', auditRoutes)
 app.use('/api/leakage', leakageRoutes)
 app.use('/api/evaluation', evaluationRoutes)
+app.use('/api/integration', integrationRoutes)
 
 app.get('/', (req, res) => {
   res.json({
@@ -65,4 +67,12 @@ process.on('SIGTERM', () => {
   server.close(() => {
     process.exit(0)
   })
+})
+
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled Promise Rejection:', reason)
+})
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err)
 })

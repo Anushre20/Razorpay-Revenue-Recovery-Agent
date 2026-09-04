@@ -52,3 +52,18 @@ export async function createTestPaymentLink({
 
   return paymentLink
 }
+
+export async function verifyCredentials() {
+  const rp = getRazorpay()
+  const result = await rp.payments.all({ count: 1 })
+  return { verified: true, paymentCount: result.count || 0 }
+}
+
+export async function listPayments({ count = 100, skip = 0, from, to } = {}) {
+  const rp = getRazorpay()
+  const params = { count, skip }
+  if (from) params.from = from
+  if (to) params.to = to
+  const result = await rp.payments.all(params)
+  return result
+}

@@ -1,27 +1,31 @@
-import transactions from '../data/transactions.json' with { type: 'json' }
+import {
+  getTransactionsBySource,
+  findTransaction,
+} from '../services/transactionStore.js'
 
 export const getTransactions = (req, res) => {
+  const source = req.query.source
+  const result = source ? getTransactionsBySource(source) : getTransactionsBySource('all')
+
   res.json({
     success: true,
-    count: transactions.length,
-    data: transactions,
+    count: result.length,
+    data: result,
   })
 }
 
 export const getTransactionById = (req, res) => {
-  const transaction = transactions.find(
-    (item) => item.id === req.params.id,
-  )
+  const transaction = findTransaction(req.params.id)
 
-  if (!transaction) {
-    return res.status(404).json({
-      success: false,
-      message: 'Transaction not found',
+  if (transaction) {
+    return res.json({
+      success: true,
+      data: transaction,
     })
   }
 
-  res.json({
-    success: true,
-    data: transaction,
+  return res.status(404).json({
+    success: false,
+    message: 'Transaction not found',
   })
 }

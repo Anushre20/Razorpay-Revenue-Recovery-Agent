@@ -1,11 +1,5 @@
-import transactions from '../data/transactions.json' with { type: 'json' }
+import { findTransaction } from './transactionStore.js'
 import { checkGuardrails } from './guardrailService.js'
-
-function findTransaction(txnId) {
-  return transactions.find(
-    (transaction) => transaction.id === txnId,
-  )
-}
 
 function decideRecoveryAction(transaction) {
   const {

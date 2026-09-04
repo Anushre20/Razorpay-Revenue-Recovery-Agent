@@ -1,4 +1,4 @@
-import transactions from '../data/transactions.json' with { type: 'json' }
+import { getTransactionsBySource } from './transactionStore.js'
 
 function calculateLeakageScore(transaction) {
   let score = transaction.riskScore
@@ -54,7 +54,16 @@ function getLeakageLevel(score) {
 }
 
 export function detectLeakage(filters = {}) {
-  let results = transactions.map((transaction) => {
+  const source = filters.source
+
+  let rawTransactions
+  if (source) {
+    rawTransactions = getTransactionsBySource(source)
+  } else {
+    rawTransactions = getTransactionsBySource('all')
+  }
+
+  let results = rawTransactions.map((transaction) => {
     const leakageScore =
       calculateLeakageScore(transaction)
 

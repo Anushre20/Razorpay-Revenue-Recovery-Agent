@@ -9,13 +9,21 @@ export interface ApiResponse<T> {
 
 export async function apiRequest<T>(path: string, options?: RequestInit): Promise<T> {
   const url = `${API_URL}${path}`;
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers,
+      },
+    });
+  } catch (err) {
+    if (err instanceof TypeError && err.message === 'Failed to fetch') {
+      throw new Error('Backend unavailable — please ensure the backend is running on ' + API_URL);
+    }
+    throw err;
+  }
 
   const json = await res.json();
 

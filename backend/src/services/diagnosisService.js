@@ -1,10 +1,4 @@
-import transactions from '../data/transactions.json' with { type: 'json' }
-
-function findTransaction(txnId) {
-  return transactions.find(
-    (transaction) => transaction.id === txnId,
-  )
-}
+import { findTransaction } from './transactionStore.js'
 
 function getProblem(transaction) {
   const { type, failureReason } = transaction

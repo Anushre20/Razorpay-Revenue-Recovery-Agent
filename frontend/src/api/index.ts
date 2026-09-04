@@ -27,12 +27,14 @@ export interface Transaction {
   groundTruthAction: string;
   groundTruthRecoverable: boolean;
   groundTruthRecoveredAmount: number;
+  source?: 'historical' | 'razorpay_test' | 'demo';
 }
 
 export interface LeakageTransaction extends Transaction {
   leakageScore: number;
   leakageLevel: string;
   revenueAtRisk: number;
+  source?: 'historical' | 'razorpay_test' | 'demo';
 }
 
 export interface LeakageSummary {
@@ -310,3 +312,56 @@ export interface EvaluationData {
 }
 
 export const fetchEvaluation = () => apiGet<{ success: boolean; data: EvaluationData }>('/api/evaluation');
+
+// --- Integration Types ---
+export interface IntegrationStatus {
+  success: boolean;
+  connected: boolean;
+  provider: string;
+  environment: string;
+  merchant?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  syncedTransactions: number;
+  lastSyncedAt: string | null;
+  error?: string;
+}
+
+export interface SyncResult {
+  success: boolean;
+  source: string;
+  fetched: number;
+  inserted: number;
+  updated: number;
+  skipped: number;
+  totalSynced: number;
+  lastSyncedAt: string;
+  error?: string;
+}
+
+// Integration
+export const fetchIntegrationStatus = () => apiGet<IntegrationStatus>('/api/integration/status');
+export const syncRazorpayTransactions = () => apiPost<SyncResult>('/api/integration/sync');
+
+// --- Evaluate Transaction ---
+export interface EvaluateRequest {
+  amount: number;
+  paymentMethod: string;
+  failureReason: string;
+  attempts?: number;
+  customerSegment?: string;
+  merchant?: string;
+  customer?: string;
+}
+
+export interface EvaluateResponse {
+  success: boolean;
+  transaction: Transaction;
+  diagnosis: Diagnosis;
+  decision: RecoveryDecision;
+}
+
+export const evaluateTransaction = (data: EvaluateRequest) =>
+  apiPost<EvaluateResponse>('/api/transactions/evaluate', data);

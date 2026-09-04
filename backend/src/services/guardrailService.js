@@ -1,14 +1,8 @@
-import transactions from '../data/transactions.json' with { type: 'json' }
+import { findTransaction } from './transactionStore.js'
 
 const MAX_RETRY_ATTEMPTS = 3
 const MAX_AUTOMATIC_RECOVERY_AMOUNT = 25000
 const MIN_RECOVERABILITY = 30
-
-function findTransaction(txnId) {
-  return transactions.find(
-    (transaction) => transaction.id === txnId,
-  )
-}
 
 function checkRetryLimit(transaction, action) {
   if (

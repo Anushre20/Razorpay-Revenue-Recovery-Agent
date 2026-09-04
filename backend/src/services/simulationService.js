@@ -1,4 +1,4 @@
-import transactions from '../data/transactions.json' with { type: 'json' }
+import { findTransaction } from './transactionStore.js'
 import { getRecoveryDecision } from './recoveryService.js'
 import { checkGuardrails } from './guardrailService.js'
 import fs from 'fs'
@@ -39,12 +39,6 @@ function writeSimulationResults(results) {
     console.error('Failed to write simulationResults.json:', error.message)
     return false
   }
-}
-
-function findTransaction(txnId) {
-  return transactions.find(
-    (transaction) => transaction.id === txnId,
-  )
 }
 
 export function simulateRecovery(txnId) {

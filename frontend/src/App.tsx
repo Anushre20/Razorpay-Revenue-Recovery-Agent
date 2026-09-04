@@ -8,15 +8,16 @@ import {
   type Diagnosis, type RecoveryAction as RecoveryActionType, type AgentLog,
   type AuditLog, type AuditGuardrail, type AnalyticsSummary,
   type DashboardData, type Merchant, type RecoveryDecision, type GuardrailCheckResult, type SimulationResult,
-  type EvaluationData,
-  fetchTransactions, fetchLeakage, fetchDiagnosis, fetchRecoveryActions,
+  type EvaluationData, type IntegrationStatus, type SyncResult, type EvaluateResponse,
+  fetchTransactions, fetchTransaction, fetchLeakage, fetchDiagnosis, fetchRecoveryActions,
   fetchRecoveryDecision, fetchGuardrailCheck, simulateRecovery,
   fetchAgentLogs, fetchAuditTrail, fetchAuditGuardrails, fetchAnalytics,
-  fetchDashboard, fetchMerchants, executeRecovery, fetchEvaluation
+  fetchDashboard, fetchMerchants, executeRecovery, fetchEvaluation,
+  fetchIntegrationStatus, syncRazorpayTransactions, evaluateTransaction
 } from "./api";
 
 
-type NavItem = "dashboard" | "leakage" | "diagnosis" | "actions" | "agent" | "guardrails" | "audit" | "analytics" | "merchants";
+type NavItem = "dashboard" | "leakage" | "diagnosis" | "actions" | "agent" | "guardrails" | "audit" | "analytics" | "merchants" | "integration";
 
 const fmt = (n: number) => {
   if (n >= 100000) return `₹${(n / 100000).toFixed(1)}L`;
@@ -106,6 +107,7 @@ const navItems: { id: NavItem; label: string; icon: string }[] = [
   { id: "audit", label: "Audit Trail", icon: "📋" },
   { id: "analytics", label: "Analytics", icon: "📊" },
   { id: "merchants", label: "Merchant View", icon: "🏪" },
+  { id: "integration", label: "Integration", icon: "🔗" },
 ];
 
 function Sidebar({ active, onNav, searchQuery, onSearchChange, onSearchSubmit, badgeCounts }: {
@@ -456,8 +458,10 @@ function DashboardView({ onNavigate, dateRange }: { onNavigate: (n: NavItem) => 
 
 function LeakageView({ onNavigate, dateRange }: { onNavigate: (n: NavItem) => void; dateRange: string }) {
   const [filter, setFilter] = useState("All");
+  const [sourceFilter, setSourceFilter] = useState("all");
   const [search, setSearch] = useState("");
   const categories = ["All", "Failed Payment", "Abandoned Checkout", "Subscription Failure"];
+  const sourceOptions = ["all", "historical", "razorpay_test", "demo"];
 
   const [allTxns, setAllTxns] = useState<LeakageTransaction[]>([]);
   const [summary, setSummary] = useState<LeakageSummary | null>(null);
@@ -468,8 +472,10 @@ function LeakageView({ onNavigate, dateRange }: { onNavigate: (n: NavItem) => vo
     setLoading(true);
     setError(null);
     try {
-      const params = type && type !== "All" ? { type } : undefined;
-      const res = await fetchLeakage(params);
+      const params: Record<string, string> = {};
+      if (type && type !== "All") params.type = type;
+      if (sourceFilter !== "all") params.source = sourceFilter;
+      const res = await fetchLeakage(Object.keys(params).length > 0 ? params : undefined);
       setAllTxns(res.data || []);
       setSummary(res.summary || null);
     } catch (err) {
@@ -477,7 +483,7 @@ function LeakageView({ onNavigate, dateRange }: { onNavigate: (n: NavItem) => vo
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [sourceFilter]);
 
   useEffect(() => {
     fetchLeakageData(filter);
@@ -519,6 +525,16 @@ function LeakageView({ onNavigate, dateRange }: { onNavigate: (n: NavItem) => vo
                 {c}
               </button>
             ))}
+            <div className="w-px h-5 bg-[#1E2D45] mx-1" />
+            {sourceOptions.map((s) => (
+              <button
+                key={s}
+                onClick={() => setSourceFilter(s)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${sourceFilter === s ? "bg-[#7C3AED] text-white" : "bg-[#1A2332] text-gray-400 hover:text-white border border-[#1E2D45]"}`}
+              >
+                {s === "all" ? "All Sources" : s === "historical" ? "Historical" : s === "razorpay_test" ? "Razorpay Test" : "Demo"}
+              </button>
+            ))}
           </div>
           <input
             value={search}
@@ -533,6 +549,7 @@ function LeakageView({ onNavigate, dateRange }: { onNavigate: (n: NavItem) => vo
             <thead>
               <tr className="text-[10px] text-gray-500 uppercase tracking-wider border-b border-[#1E2D45]">
                 <th className="text-left pb-2.5">TXN ID</th>
+                <th className="text-left pb-2.5">Source</th>
                 <th className="text-left pb-2.5">Merchant</th>
                 <th className="text-left pb-2.5">Customer</th>
                 <th className="text-left pb-2.5">Amount</th>
@@ -547,6 +564,17 @@ function LeakageView({ onNavigate, dateRange }: { onNavigate: (n: NavItem) => vo
               {filtered.map((t) => (
                 <tr key={t.id} onClick={() => onNavigate("diagnosis")} className="table-row-hover border-b border-[#1E2D45]/40 cursor-pointer group">
                   <td className="py-3 font-mono text-[11px] text-[#3B82F6] group-hover:text-blue-300">{t.id}</td>
+                  <td className="py-3">
+                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-medium border ${
+                      t.source === 'razorpay_test'
+                        ? 'bg-purple-500/10 text-purple-400 border-purple-500/20'
+                        : t.source === 'demo'
+                        ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                        : 'bg-gray-500/10 text-gray-400 border-gray-500/20'
+                    }`}>
+                      {t.source === 'razorpay_test' ? 'RAZORPAY TEST' : t.source === 'demo' ? 'DEMO' : 'HISTORICAL'}
+                    </span>
+                  </td>
                   <td className="py-3 text-xs text-gray-200">{t.merchant}</td>
                   <td className="py-3 text-xs text-gray-400">{t.customer}</td>
                   <td className="py-3 font-mono text-xs text-white font-medium">{fmtFull(t.amount)}</td>
@@ -773,6 +801,10 @@ function DiagnosisView({ searchQuery }: { searchQuery: string }) {
   const [diag, setDiag] = useState<Diagnosis | null>(null);
   const [diagLoading, setDiagLoading] = useState(false);
   const [diagError, setDiagError] = useState<string | null>(null);
+  const [localSearch, setLocalSearch] = useState('');
+  const [searchResult, setSearchResult] = useState<Transaction | null>(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [searching, setSearching] = useState(false);
 
   const allTxns = txnData?.data || [];
   const displayTxns = allTxns.slice(0, 20);
@@ -799,7 +831,28 @@ function DiagnosisView({ searchQuery }: { searchQuery: string }) {
     return () => { cancelled = true; };
   }, [selected]);
 
-  const txn = selected ? allTxns.find((t) => t.id === selected) : null;
+  const txn = selected ? allTxns.find((t) => t.id === selected) || searchResult : null;
+
+  const handleSearch = async () => {
+    if (!localSearch.trim()) return;
+    setSearching(true);
+    setSearchError(null);
+    setSearchResult(null);
+    try {
+      const res = await fetchTransaction(localSearch.trim());
+      if (res.success && res.data) {
+        setSearchResult(res.data);
+        setSelected(res.data.id);
+        setSearchError(null);
+      } else {
+        setSearchError('Transaction not found');
+      }
+    } catch (err) {
+      setSearchError(err instanceof Error ? err.message : 'Transaction not found');
+    } finally {
+      setSearching(false);
+    }
+  };
 
   if (txnLoading) return <LoadingSpinner />;
   if (txnError) return <ErrorMessage message={txnError} onRetry={txnRetry} />;
@@ -808,7 +861,35 @@ function DiagnosisView({ searchQuery }: { searchQuery: string }) {
     <div className="grid grid-cols-5 gap-4 h-full animate-fade-in">
       <div className="col-span-2 space-y-2">
         <Card className="p-4">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Select Transaction</p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Search Transaction</p>
+          <div className="flex gap-2 mb-3">
+            <input
+              value={localSearch}
+              onChange={(e) => setLocalSearch(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
+              className="flex-1 bg-[#111827] border border-[#1E2D45] rounded-lg px-3 py-2 text-xs text-gray-300 placeholder-gray-600 focus:outline-none focus:border-[#2563EB]"
+              placeholder="Enter Transaction ID (e.g. TXN-2847037, DEMO-123)"
+            />
+            <button
+              onClick={handleSearch}
+              disabled={searching || !localSearch.trim()}
+              className="px-3 py-2 rounded-lg text-xs font-medium bg-[#2563EB] text-white hover:bg-blue-600 disabled:bg-[#1A2332] disabled:text-gray-600 disabled:cursor-not-allowed transition-all"
+            >
+              {searching ? '...' : 'Search'}
+            </button>
+          </div>
+          {searchError && (
+            <p className="text-[11px] text-red-400 mb-2">{searchError}</p>
+          )}
+          {searchResult && (
+            <div className="p-2 bg-emerald-500/5 border border-emerald-500/20 rounded-lg mb-3">
+              <p className="text-[10px] text-emerald-400">Found: {searchResult.id}</p>
+            </div>
+          )}
+        </Card>
+
+        <Card className="p-4">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Recent Transactions</p>
           <div className="space-y-2 max-h-[600px] overflow-y-auto">
             {displayTxns.map((t) => (
               <button
@@ -1509,6 +1590,446 @@ function AnalyticsView({ dateRange }: { dateRange: string }) {
   );
 }
 
+function IntegrationView() {
+  const { data: statusData, loading: statusLoading, error: statusError, retry: retryStatus } = useApiData(fetchIntegrationStatus);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
+
+  const [showSimulate, setShowSimulate] = useState(false);
+  const [simAmount, setSimAmount] = useState('2199');
+  const [simMethod, setSimMethod] = useState('Credit Card');
+  const [simReason, setSimReason] = useState('Card Declined');
+  const [simAttempts, setSimAttempts] = useState('2');
+  const [simSegment, setSimSegment] = useState('High Value');
+  const [evaluating, setEvaluating] = useState(false);
+  const [evalResult, setEvalResult] = useState<EvaluateResponse | null>(null);
+  const [evalError, setEvalError] = useState<string | null>(null);
+
+  const status = statusData as IntegrationStatus | null;
+
+  const handleSync = async () => {
+    setSyncing(true);
+    setSyncError(null);
+    setSyncResult(null);
+    try {
+      const result = await syncRazorpayTransactions();
+      setSyncResult(result);
+      retryStatus();
+    } catch (err) {
+      setSyncError(err instanceof Error ? err.message : 'Sync failed');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleEvaluate = async () => {
+    setEvaluating(true);
+    setEvalError(null);
+    setEvalResult(null);
+    try {
+      const result = await evaluateTransaction({
+        amount: Number(simAmount) || 2199,
+        paymentMethod: simMethod,
+        failureReason: simReason,
+        attempts: Number(simAttempts) || 1,
+        customerSegment: simSegment,
+      });
+      setEvalResult(result);
+    } catch (err) {
+      setEvalError(err instanceof Error ? err.message : 'Evaluation failed');
+    } finally {
+      setEvaluating(false);
+    }
+  };
+
+  if (statusLoading) return <LoadingSpinner />;
+  if (statusError) return <ErrorMessage message={statusError} onRetry={retryStatus} />;
+
+  return (
+    <div className="space-y-4 animate-fade-in">
+      <div className="grid grid-cols-3 gap-4">
+        <StatCard
+          label="Integration Status"
+          value={status?.connected ? 'Connected' : 'Not Connected'}
+          sub={status?.connected ? 'Razorpay Test Mode' : 'Credentials not verified'}
+        />
+        <StatCard
+          label="Synced Transactions"
+          value={String(status?.syncedTransactions || 0)}
+          sub="From Razorpay Test Mode"
+        />
+        <StatCard
+          label="Last Sync"
+          value={status?.lastSyncedAt ? new Date(status.lastSyncedAt).toLocaleDateString() : 'Never'}
+          sub={status?.lastSyncedAt ? new Date(status.lastSyncedAt).toLocaleTimeString() : 'No sync performed yet'}
+        />
+      </div>
+
+      <Card className="p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <p className="text-sm font-semibold text-white font-display">Razorpay Integration</p>
+            <p className="text-xs text-gray-500 mt-0.5">Test Mode</p>
+          </div>
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${
+            status?.connected
+              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+              : 'bg-red-500/10 text-red-400 border border-red-500/20'
+          }`}>
+            <div className={`w-2 h-2 rounded-full ${status?.connected ? 'bg-emerald-400' : 'bg-red-400'}`} />
+            {status?.connected ? 'Connected' : 'Not Connected'}
+          </div>
+        </div>
+
+        {status?.merchant && (
+          <div className="bg-[#1A2332] rounded-xl border border-[#1E2D45] p-4 mb-4">
+            <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Merchant Information</p>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <p className="text-[10px] text-gray-500">Name</p>
+                <p className="text-xs text-white font-medium">{status.merchant.name}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-gray-500">Email</p>
+                <p className="text-xs text-white font-medium">{status.merchant.email}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-gray-500">Account ID</p>
+                <p className="text-xs text-white font-mono">{status.merchant.id}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {status?.error && (
+          <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-4 mb-4">
+            <p className="text-xs text-red-400">{status.error}</p>
+          </div>
+        )}
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => retryStatus()}
+            className="px-4 py-2 rounded-lg text-xs font-medium bg-[#1A2332] text-gray-300 border border-[#1E2D45] hover:border-[#2563EB] hover:text-white transition-all"
+          >
+            Test Connection
+          </button>
+          <button
+            onClick={handleSync}
+            disabled={!status?.connected || syncing}
+            className={`px-4 py-2 rounded-lg text-xs font-medium transition-all ${
+              status?.connected && !syncing
+                ? 'bg-[#2563EB] text-white hover:bg-blue-600'
+                : 'bg-[#1A2332] text-gray-600 cursor-not-allowed border border-[#1E2D45]'
+            }`}
+          >
+            {syncing ? 'Syncing...' : 'Sync Transactions'}
+          </button>
+        </div>
+      </Card>
+
+      {syncResult && (
+        <Card className="p-5">
+          <p className="text-sm font-semibold text-white font-display mb-3">Sync Result</p>
+          <div className="grid grid-cols-5 gap-4">
+            <div className="p-3 bg-[#1A2332] rounded-lg border border-[#1E2D45]">
+              <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-1">Fetched</p>
+              <p className="text-lg font-bold font-mono text-white">{syncResult.fetched}</p>
+            </div>
+            <div className="p-3 bg-[#1A2332] rounded-lg border border-[#1E2D45]">
+              <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-1">Inserted</p>
+              <p className="text-lg font-bold font-mono text-emerald-400">{syncResult.inserted}</p>
+            </div>
+            <div className="p-3 bg-[#1A2332] rounded-lg border border-[#1E2D45]">
+              <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-1">Updated</p>
+              <p className="text-lg font-bold font-mono text-blue-400">{syncResult.updated}</p>
+            </div>
+            <div className="p-3 bg-[#1A2332] rounded-lg border border-[#1E2D45]">
+              <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-1">Skipped</p>
+              <p className="text-lg font-bold font-mono text-gray-400">{syncResult.skipped}</p>
+            </div>
+            <div className="p-3 bg-[#1A2332] rounded-lg border border-[#1E2D45]">
+              <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-1">Total Synced</p>
+              <p className="text-lg font-bold font-mono text-white">{syncResult.totalSynced}</p>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {syncError && (
+        <Card className="p-5">
+          <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-4">
+            <p className="text-xs text-red-400">{syncError}</p>
+          </div>
+        </Card>
+      )}
+
+      <Card className="p-5">
+        <p className="text-sm font-semibold text-white font-display mb-3">How It Works</p>
+        <div className="space-y-3">
+          <div className="flex items-start gap-3">
+            <div className="w-6 h-6 rounded-full bg-[#2563EB]/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <span className="text-[10px] text-[#3B82F6] font-bold">1</span>
+            </div>
+            <div>
+              <p className="text-xs text-white font-medium">Verify Connection</p>
+              <p className="text-[11px] text-gray-500">Backend verifies Razorpay Test Mode credentials</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <div className="w-6 h-6 rounded-full bg-[#2563EB]/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <span className="text-[10px] text-[#3B82F6] font-bold">2</span>
+            </div>
+            <div>
+              <p className="text-xs text-white font-medium">Sync Payments</p>
+              <p className="text-[11px] text-gray-500">Fetch available payments from Razorpay Test Mode</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <div className="w-6 h-6 rounded-full bg-[#2563EB]/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <span className="text-[10px] text-[#3B82F6] font-bold">3</span>
+            </div>
+            <div>
+              <p className="text-xs text-white font-medium">View in Revenue Leakage</p>
+              <p className="text-[11px] text-gray-500">Synced transactions appear with a [RAZORPAY TEST] badge</p>
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      <Card className="p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <p className="text-sm font-semibold text-white font-display">Simulate New Payment</p>
+            <p className="text-[11px] text-gray-500 mt-0.5">Create a demo transaction and run AI evaluation</p>
+          </div>
+          <button
+            onClick={() => setShowSimulate(!showSimulate)}
+            className="px-4 py-2 rounded-lg text-xs font-medium bg-[#2563EB] text-white hover:bg-blue-600 transition-all"
+          >
+            {showSimulate ? 'Close' : 'Simulate New Payment'}
+          </button>
+        </div>
+
+        {showSimulate && (
+          <div className="bg-[#1A2332] rounded-xl border border-[#1E2D45] p-4">
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="text-[10px] text-gray-500 uppercase tracking-wider mb-1 block">Amount (₹)</label>
+                <input
+                  type="number"
+                  value={simAmount}
+                  onChange={(e) => setSimAmount(e.target.value)}
+                  className="w-full bg-[#111827] border border-[#1E2D45] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#2563EB]"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-gray-500 uppercase tracking-wider mb-1 block">Payment Method</label>
+                <select
+                  value={simMethod}
+                  onChange={(e) => setSimMethod(e.target.value)}
+                  className="w-full bg-[#111827] border border-[#1E2D45] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#2563EB]"
+                >
+                  <option>Credit Card</option>
+                  <option>Debit Card</option>
+                  <option>UPI</option>
+                  <option>Net Banking</option>
+                  <option>Wallet</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] text-gray-500 uppercase tracking-wider mb-1 block">Failure Reason</label>
+                <select
+                  value={simReason}
+                  onChange={(e) => setSimReason(e.target.value)}
+                  className="w-full bg-[#111827] border border-[#1E2D45] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#2563EB]"
+                >
+                  <option>Card Declined</option>
+                  <option>Insufficient Funds</option>
+                  <option>Expired Card</option>
+                  <option>Bank Server Timeout</option>
+                  <option>Network Error</option>
+                  <option>3D Secure Authentication Failed</option>
+                  <option>Checkout Abandoned</option>
+                  <option>Payment Method Expired</option>
+                  <option>Daily Limit Exceeded</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] text-gray-500 uppercase tracking-wider mb-1 block">Attempts</label>
+                <input
+                  type="number"
+                  value={simAttempts}
+                  onChange={(e) => setSimAttempts(e.target.value)}
+                  min="1"
+                  max="10"
+                  className="w-full bg-[#111827] border border-[#1E2D45] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#2563EB]"
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="text-[10px] text-gray-500 uppercase tracking-wider mb-1 block">Customer Segment</label>
+                <select
+                  value={simSegment}
+                  onChange={(e) => setSimSegment(e.target.value)}
+                  className="w-full bg-[#111827] border border-[#1E2D45] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#2563EB]"
+                >
+                  <option>New</option>
+                  <option>Regular</option>
+                  <option>Loyal</option>
+                  <option>High Value</option>
+                </select>
+              </div>
+            </div>
+            <button
+              onClick={handleEvaluate}
+              disabled={evaluating}
+              className={`w-full py-2.5 rounded-lg text-xs font-medium transition-all ${
+                evaluating
+                  ? 'bg-[#1A2332] text-gray-600 cursor-not-allowed border border-[#1E2D45]'
+                  : 'bg-emerald-600 text-white hover:bg-emerald-700'
+              }`}
+            >
+              {evaluating ? 'Evaluating...' : 'Evaluate Transaction'}
+            </button>
+          </div>
+        )}
+      </Card>
+
+      {evalError && (
+        <Card className="p-5">
+          <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-4">
+            <p className="text-xs text-red-400">{evalError}</p>
+          </div>
+        </Card>
+      )}
+
+      {evalResult && evalResult.transaction && (
+        <Card className="p-5">
+          <p className="text-sm font-semibold text-white font-display mb-4">Evaluation Result</p>
+
+          <div className="bg-[#1A2332] rounded-xl border border-[#1E2D45] p-4 mb-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                DEMO
+              </div>
+              <span className="font-mono text-xs text-[#3B82F6]">{evalResult.transaction.id}</span>
+              <span className="text-[10px] text-gray-500">Source: Demo</span>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <p className="text-[10px] text-gray-500">Amount</p>
+                <p className="text-sm font-bold font-mono text-white">{fmtFull(evalResult.transaction.amount)}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-gray-500">Payment Method</p>
+                <p className="text-xs text-white">{evalResult.transaction.paymentMethod}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-gray-500">Failure Reason</p>
+                <p className="text-xs text-white">{evalResult.transaction.failureReason}</p>
+              </div>
+            </div>
+          </div>
+
+          {evalResult.diagnosis && (
+            <div className="bg-[#1A2332] rounded-xl border border-[#1E2D45] p-4 mb-4">
+              <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-3">AI Diagnosis</p>
+              <div className="grid grid-cols-2 gap-4 mb-3">
+                <div>
+                  <p className="text-[10px] text-gray-500">Risk Score</p>
+                  <div className="flex items-center gap-2">
+                    <div className="w-16 h-1.5 bg-[#1E2D45] rounded-full">
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${evalResult.diagnosis.riskScore}%`,
+                          background: evalResult.diagnosis.riskScore >= 70 ? '#EF4444' : evalResult.diagnosis.riskScore >= 40 ? '#F59E0B' : '#10B981'
+                        }}
+                      />
+                    </div>
+                    <span className="text-xs font-mono text-white">{evalResult.diagnosis.riskScore}</span>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-500">Recoverability</p>
+                  <div className="flex items-center gap-2">
+                    <div className="w-16 h-1.5 bg-[#1E2D45] rounded-full">
+                      <div
+                        className="h-full rounded-full bg-[#2563EB]"
+                        style={{ width: `${evalResult.diagnosis.recoverability}%` }}
+                      />
+                    </div>
+                    <span className="text-xs font-mono text-white">{evalResult.diagnosis.recoverability}%</span>
+                  </div>
+                </div>
+              </div>
+              <div className="mb-2">
+                <p className="text-[10px] text-gray-500">Problem</p>
+                <p className="text-xs text-red-400">{evalResult.diagnosis.problem}</p>
+              </div>
+              <div className="mb-2">
+                <p className="text-[10px] text-gray-500">Root Cause</p>
+                <p className="text-xs text-white">{evalResult.diagnosis.rootCause}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-gray-500">Confidence</p>
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  {evalResult.diagnosis.confidence}%
+                </span>
+              </div>
+            </div>
+          )}
+
+          {evalResult.decision && (
+            <div className="bg-[#1A2332] rounded-xl border border-[#1E2D45] p-4 mb-4">
+              <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-3">AI Recovery Decision</p>
+              <div className="grid grid-cols-2 gap-4 mb-3">
+                <div>
+                  <p className="text-[10px] text-gray-500">Recommended Action</p>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-[#2563EB]/10 text-[#3B82F6] border border-[#2563EB]/20">
+                    {evalResult.decision.action}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-500">Initial Action</p>
+                  <span className="text-xs text-gray-400">{evalResult.decision.initialAction}</span>
+                </div>
+              </div>
+              <div className="mb-2">
+                <p className="text-[10px] text-gray-500">Reason</p>
+                <p className="text-xs text-white">{evalResult.decision.reason}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-gray-500">Requires Approval</p>
+                <span className={`text-xs ${evalResult.decision.requiresApproval ? 'text-amber-400' : 'text-emerald-400'}`}>
+                  {evalResult.decision.requiresApproval ? 'Yes' : 'No'}
+                </span>
+              </div>
+            </div>
+          )}
+
+          <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-emerald-400 text-sm">✓</span>
+              <span className="text-xs text-emerald-400 font-medium">Transaction stored</span>
+            </div>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-emerald-400 text-sm">✓</span>
+              <span className="text-xs text-emerald-400 font-medium">AI diagnosis completed</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-emerald-400 text-sm">✓</span>
+              <span className="text-xs text-emerald-400 font-medium">Recovery decision completed</span>
+            </div>
+            <p className="text-[10px] text-gray-500 mt-2">Status: Awaiting Recovery</p>
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
+
 function MerchantsView() {
   const { data, loading, error, retry } = useApiData(fetchMerchants);
   const merchantsList = data?.data || [];
@@ -1613,6 +2134,7 @@ const viewTitles: Record<NavItem, { title: string; sub: string }> = {
   audit: { title: "Audit Trail", sub: "Complete log of AI decisions, policy checks, and outcomes" },
   analytics: { title: "Analytics & Insights", sub: "Performance metrics, recovery trends, and intervention stats" },
   merchants: { title: "Merchant View", sub: "Per-merchant recovery metrics and active case counts" },
+  integration: { title: "Razorpay Integration", sub: "Connect and sync transactions from Razorpay Test Mode" },
 };
 
 export default function App() {
@@ -1639,6 +2161,7 @@ export default function App() {
       case "audit": return <AuditView />;
       case "analytics": return <AnalyticsView dateRange={dateRange} />;
       case "merchants": return <MerchantsView />;
+      case "integration": return <IntegrationView />;
     }
   };
 

@@ -1,14 +1,8 @@
 import express from 'express'
-import {
-  getTransactions,
-  getTransactionById,
-} from '../controllers/transactionController.js'
 import { evaluateTransaction } from '../controllers/transactionEvaluationController.js'
 
 const router = express.Router()
 
 router.post('/evaluate', evaluateTransaction)
-router.get('/', getTransactions)
-router.get('/:id', getTransactionById)
 
 export default router
