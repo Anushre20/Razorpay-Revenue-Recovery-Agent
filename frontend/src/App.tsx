@@ -279,7 +279,7 @@ function DashboardView({ onNavigate, dateRange }: { onNavigate: (n: NavItem) => 
   const leakage = useApiData(fetchLeakage);
   const agentRunsRes = useApiData(fetchAgentRuns);
   const intelligence = mi.data?.data;
-  const allLeakageTxns = leakage.data?.data || [];
+  const allLeakageTxns = (leakage.data?.data || []).filter((t: any) => t.source === 'demo' || t.source === 'razorpay_test');
   const leakageTxns = filterByDateRange(allLeakageTxns, Number(dateRange));
   const agentRuns = agentRunsRes.data?.data || [];
 
@@ -334,7 +334,7 @@ function DashboardView({ onNavigate, dateRange }: { onNavigate: (n: NavItem) => 
       {overview ? (
         <>
           <div className="grid grid-cols-4 gap-4">
-            <StatCard label="Money at Risk" value={fmt(overview.moneyAtRisk)} sub={`${overview.atRiskCount} active cases`} />
+            <StatCard label="Current Merchant At Risk" value={fmt(overview.moneyAtRisk)} sub={`${overview.atRiskCount} active cases · Live data`} />
             <StatCard label="Recovered" value={fmt(overview.recoveredAmount)} sub={`${overview.successfulRecoveries} successful recoveries`} accent />
             <StatCard label="Active Recovery Cases" value={String(overview.activeRecoveryCases)} sub="Awaiting action" />
             <StatCard label="New Failures" value={String(overview.newFailures)} sub="Detected in current period" />
@@ -343,7 +343,7 @@ function DashboardView({ onNavigate, dateRange }: { onNavigate: (n: NavItem) => 
           <div className="grid grid-cols-4 gap-4">
             <StatCard label="Blocked Actions" value={String(overview.blockedActions)} sub="Guardrail blocked" />
             <StatCard label="Pending Actions" value={String(overview.pendingActions)} sub="Running or awaiting approval" />
-            <StatCard label="Recovery Rate" value={`${overview.recoveryRate}%`} sub="Recovered / At Risk" />
+            <StatCard label="Recovery Rate" value={`${overview.recoveryRate}%`} sub="Recovered / At Risk · Live data" />
             <StatCard label="Data Points" value={String(intelligence?.dataAvailability?.liveCount || 0)} sub="Live/test transactions" />
           </div>
         </>
@@ -449,7 +449,7 @@ function DashboardView({ onNavigate, dateRange }: { onNavigate: (n: NavItem) => 
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="text-sm font-semibold font-display text-white">Recovery Performance</p>
-              <p className="text-xs text-gray-500">7-day at-risk vs recovered</p>
+              <p className="text-xs text-gray-500">At-risk vs recovered · Live data</p>
             </div>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-1.5">
@@ -485,7 +485,7 @@ function DashboardView({ onNavigate, dateRange }: { onNavigate: (n: NavItem) => 
 
         <Card className="p-5">
           <p className="text-sm font-semibold font-display text-white mb-1">Leakage by Type</p>
-          <p className="text-xs text-gray-500 mb-4">Distribution this week</p>
+          <p className="text-xs text-gray-500 mb-4">Distribution · Live data</p>
           <ResponsiveContainer width="100%" height={160}>
             <PieChart>
               <Pie data={[
@@ -648,7 +648,7 @@ function LeakageView({ onNavigate, dateRange }: { onNavigate: (n: NavItem) => vo
   return (
     <div className="space-y-4 animate-fade-in">
       <div className="grid grid-cols-4 gap-4">
-        <StatCard label="Total At Risk" value={fmt(summary?.totalAtRisk || 0)} sub={`${summary?.totalCases || allTxns.length} transactions`} />
+        <StatCard label="Total At Risk" value={fmt(summary?.totalAtRisk || 0)} sub={`${summary?.totalCases || allTxns.length} transactions · ${sourceFilter === 'all' ? 'All Sources' : sourceFilter === 'historical' ? 'Historical' : sourceFilter === 'razorpay_test' ? 'Razorpay Test' : 'Demo'}`} />
         <StatCard label="High Risk (80+)" value={fmt(highRiskAmount)} sub={`${highRisk.length} transactions`} />
         <StatCard label="In Recovery" value={fmt(allTxns.filter(t => t.leakageLevel === 'High' || t.leakageLevel === 'Critical').reduce((s, t) => s + t.amount, 0))} sub={`${allTxns.filter(t => t.leakageLevel === 'High' || t.leakageLevel === 'Critical').length} transactions`} />
         <StatCard label="Avg Risk Score" value={String(avgRisk)} sub="Across all open cases" />
@@ -2214,7 +2214,7 @@ function AnalyticsView({ dateRange }: { dateRange: string }) {
   const { data, loading, error, retry } = useApiData(fetchAnalytics);
   const analytics = data?.data;
   const { data: txnData, loading: txnLoading } = useApiData(fetchTransactions);
-  const txns = filterByDateRange(txnData?.data || [], Number(dateRange));
+  const txns = filterByDateRange((txnData?.data || []).filter((t: any) => t.source === 'historical'), Number(dateRange));
   const { data: evalData, loading: evalLoading } = useApiData(fetchEvaluation);
   const evaluation = evalData?.data;
   const { data: mlData, loading: mlLoading } = useApiData(fetchMLMetrics);
@@ -2629,9 +2629,9 @@ function AnalyticsView({ dateRange }: { dateRange: string }) {
         </div>
         <div className="p-5 space-y-4">
           <div className="grid grid-cols-4 gap-4">
-            <StatCard label="Money At Risk" value={fmt(analytics?.totalAtRisk || 0)} sub="Recoverable amount in dataset" />
-            <StatCard label="Money Recovered" value={fmt(analytics?.totalRecovered || 0)} sub="Confirmed recovered (ground truth)" accent />
-            <StatCard label="Recovery Rate" value={`${analytics?.recoveryRate || 0}%`} sub="Recovered / At Risk" />
+            <StatCard label="Historical At Risk" value={fmt(analytics?.totalAtRisk || 0)} sub="Recoverable amount · 5,000 historical txns" />
+            <StatCard label="Historical Recovered" value={fmt(analytics?.totalRecovered || 0)} sub="Confirmed recovered (ground truth)" accent />
+            <StatCard label="Historical Recovery Rate" value={`${analytics?.recoveryRate || 0}%`} sub="Recovered / At Risk · Historical" />
             <StatCard label="Successful Interventions" value={String(analytics?.successfulInterventions || 0)} sub="Correct AI decisions" />
           </div>
 

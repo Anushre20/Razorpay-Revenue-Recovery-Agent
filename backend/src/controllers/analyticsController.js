@@ -31,9 +31,6 @@ export const getDashboard = (req, res) => {
       totalAtRisk: evaluation.totalAtRisk,
       totalRecovered: evaluation.totalRecovered,
       recoveryRate: evaluation.recoveryRate,
-      failedPayments: 4850000,
-      abandonedCheckouts: 3200000,
-      subscriptionFailures: 2650000,
       activeCases: transactionsCount(),
     },
   })
