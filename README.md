@@ -384,22 +384,8 @@ Detection + AI Diagnosis + ML Prediction + Autonomous Decision-Making + Bounded 
 
 ---
 
-## 📌 Current Status
-
-| Phase | Status |
-|---|---|
-| Phase 1 — Razorpay Integration | Complete |
-| Phase 2 — Transaction Ingestion | Complete |
-| Phase 3 — ML Intelligence | Complete |
-| Phase 4 — Autonomous Agent | Complete |
-| Phase 5 — Merchant Intelligence | Complete |
-| Phase 6 — Safety, Guardrails & Audit | Complete |
-| Phase 7 — Evaluation & Proof | Complete |
-
----
-
 ## Author
 
 Built for the Razorpay AI Buildathon — Track 3: AI Revenue Recovery.
 
-**Repository:** [github.com/Anushre20/Revenue-Recovery-Agent](https://github.com/Anushre20/Revenue-Recovery-Agent)
+**Anupama**
