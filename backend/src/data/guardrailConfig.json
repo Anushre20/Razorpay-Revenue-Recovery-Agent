@@ -1,0 +1,27 @@
+{
+  "rules": {
+    "maxRetryAttempts": {
+      "value": 3,
+      "enabled": true,
+      "name": "Maximum Retry Attempts",
+      "description": "Maximum number of automated payment retries allowed per transaction",
+      "unit": "attempts"
+    },
+    "maxAutomaticRecoveryAmount": {
+      "value": 25000,
+      "enabled": true,
+      "name": "Automatic Recovery Amount",
+      "description": "Automatic recovery is restricted for transactions above this amount",
+      "unit": "INR"
+    },
+    "minimumRecoverability": {
+      "value": 30,
+      "enabled": true,
+      "name": "Minimum Recoverability",
+      "description": "Minimum recoverability score required for automatic recovery actions",
+      "unit": "%"
+    }
+  },
+  "lastUpdated": "2026-09-04T17:09:38.796Z",
+  "updatedBy": "merchant"
+}

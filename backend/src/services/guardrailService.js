@@ -1,27 +1,34 @@
 import { findTransaction } from './transactionStore.js'
+import { getGuardrailConfig } from './guardrailConfigStore.js'
 
-const MAX_RETRY_ATTEMPTS = 3
-const MAX_AUTOMATIC_RECOVERY_AMOUNT = 25000
-const MIN_RECOVERABILITY = 30
+function getLimits() {
+  const config = getGuardrailConfig()
+  if (!config || !config.rules) {
+    return { maxRetryAttempts: 3, maxAutomaticRecoveryAmount: 25000, minimumRecoverability: 30 }
+  }
+  return {
+    maxRetryAttempts: config.rules.maxRetryAttempts?.enabled ? config.rules.maxRetryAttempts.value : 3,
+    maxAutomaticRecoveryAmount: config.rules.maxAutomaticRecoveryAmount?.enabled ? config.rules.maxAutomaticRecoveryAmount.value : 25000,
+    minimumRecoverability: config.rules.minimumRecoverability?.enabled ? config.rules.minimumRecoverability.value : 30,
+  }
+}
 
-function checkRetryLimit(transaction, action) {
+function checkRetryLimit(transaction, action, maxRetryAttempts) {
   if (
     action === 'Smart Retry' &&
-    transaction.attemptCount >= MAX_RETRY_ATTEMPTS
+    transaction.attemptCount >= maxRetryAttempts
   ) {
     return {
       passed: false,
       guardrail: 'Maximum Retry Attempts',
-      reason: `Automatic retry blocked because transaction has already reached ${MAX_RETRY_ATTEMPTS} attempts.`,
+      reason: `Automatic retry blocked because transaction has already reached ${maxRetryAttempts} attempts.`,
     }
   }
 
-  return {
-    passed: true,
-  }
+  return { passed: true }
 }
 
-function checkRecoveryAmount(transaction, action) {
+function checkRecoveryAmount(transaction, action, maxAutomaticRecoveryAmount) {
   const automaticActions = [
     'Smart Retry',
     'UPI Fallback',
@@ -33,35 +40,31 @@ function checkRecoveryAmount(transaction, action) {
 
   if (
     automaticActions.includes(action) &&
-    transaction.amount > MAX_AUTOMATIC_RECOVERY_AMOUNT
+    transaction.amount > maxAutomaticRecoveryAmount
   ) {
     return {
       passed: false,
       guardrail: 'Automatic Recovery Amount',
-      reason: `Automatic recovery blocked because transaction amount ₹${transaction.amount} exceeds the ₹${MAX_AUTOMATIC_RECOVERY_AMOUNT} limit.`,
+      reason: `Automatic recovery blocked because transaction amount ₹${transaction.amount} exceeds the ₹${maxAutomaticRecoveryAmount} limit.`,
     }
   }
 
-  return {
-    passed: true,
-  }
+  return { passed: true }
 }
 
-function checkRecoverability(transaction, action) {
+function checkRecoverability(transaction, action, minimumRecoverability) {
   if (
     action !== 'No Action' &&
-    transaction.recoverability < MIN_RECOVERABILITY
+    transaction.recoverability < minimumRecoverability
   ) {
     return {
       passed: false,
       guardrail: 'Minimum Recoverability',
-      reason: `Automatic recovery blocked because recoverability score ${transaction.recoverability} is below the minimum threshold of ${MIN_RECOVERABILITY}.`,
+      reason: `Automatic recovery blocked because recoverability score ${transaction.recoverability} is below the minimum threshold of ${minimumRecoverability}.`,
     }
   }
 
-  return {
-    passed: true,
-  }
+  return { passed: true }
 }
 
 export function checkGuardrails(txnId, action) {
@@ -71,46 +74,33 @@ export function checkGuardrails(txnId, action) {
     return null
   }
 
+  const limits = getLimits()
+
   const checks = [
-    checkRetryLimit(transaction, action),
-    checkRecoveryAmount(transaction, action),
-    checkRecoverability(transaction, action),
+    checkRetryLimit(transaction, action, limits.maxRetryAttempts),
+    checkRecoveryAmount(transaction, action, limits.maxAutomaticRecoveryAmount),
+    checkRecoverability(transaction, action, limits.minimumRecoverability),
   ]
 
-  const failedChecks = checks.filter(
-    (check) => !check.passed,
-  )
-
+  const failedChecks = checks.filter(check => !check.passed)
   const passed = failedChecks.length === 0
 
   return {
     transactionId: transaction.id,
-
     requestedAction: action,
-
     passed,
-
-    allowedAction: passed
-      ? action
-      : 'Human Escalation',
-
-    requiresApproval:
-      !passed ||
-      transaction.amount > MAX_AUTOMATIC_RECOVERY_AMOUNT,
-
+    allowedAction: passed ? action : 'Human Escalation',
+    requiresApproval: !passed || transaction.amount > limits.maxAutomaticRecoveryAmount,
     failedGuardrails: failedChecks,
-
     checks: {
       retryLimit: checks[0].passed,
       recoveryAmount: checks[1].passed,
       recoverability: checks[2].passed,
     },
-
     policy: {
-      maxRetryAttempts: MAX_RETRY_ATTEMPTS,
-      maxAutomaticRecoveryAmount:
-        MAX_AUTOMATIC_RECOVERY_AMOUNT,
-      minimumRecoverability: MIN_RECOVERABILITY,
+      maxRetryAttempts: limits.maxRetryAttempts,
+      maxAutomaticRecoveryAmount: limits.maxAutomaticRecoveryAmount,
+      minimumRecoverability: limits.minimumRecoverability,
     },
   }
 }

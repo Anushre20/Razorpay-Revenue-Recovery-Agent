@@ -50,6 +50,50 @@ function addAuditRecord(record) {
   return written
 }
 
+export function recordDetected(txnId, transaction) {
+  const record = {
+    auditId: generateAuditId(),
+    timestamp: new Date().toISOString(),
+    transactionId: txnId,
+    eventType: 'DETECTED',
+    action: 'Detection',
+    status: 'DETECTED',
+    details: {
+      transactionId: txnId,
+      source: transaction.source || 'unknown',
+      amount: transaction.amount,
+      type: transaction.type,
+      failureReason: transaction.failureReason,
+      merchant: transaction.merchant,
+      customer: transaction.customer,
+    },
+  }
+  addAuditRecord(record)
+  return record
+}
+
+export function recordDiagnosed(txnId, diagnosis) {
+  const record = {
+    auditId: generateAuditId(),
+    timestamp: new Date().toISOString(),
+    transactionId: txnId,
+    eventType: 'DIAGNOSED',
+    action: 'Diagnosis',
+    status: 'DIAGNOSED',
+    details: {
+      problem: diagnosis.problem,
+      rootCause: diagnosis.rootCause,
+      recoverability: diagnosis.recoverability,
+      riskScore: diagnosis.riskScore,
+      recommendedAction: diagnosis.recommendedAction,
+      confidence: diagnosis.confidence,
+      mlPrediction: diagnosis.mlPrediction,
+    },
+  }
+  addAuditRecord(record)
+  return record
+}
+
 export function recordAIDecision(decision) {
   const record = {
     auditId: generateAuditId(),
@@ -65,6 +109,9 @@ export function recordAIDecision(decision) {
       amount: decision.amount,
       failureReason: decision.failureReason,
       requiresApproval: decision.requiresApproval,
+      confidence: decision.mlPrediction?.action?.confidence,
+      mlAction: decision.mlPrediction?.action?.prediction,
+      mlAvailable: decision.mlPrediction?.mlAvailable,
     },
   }
   addAuditRecord(record)
@@ -72,17 +119,36 @@ export function recordAIDecision(decision) {
 }
 
 export function recordPolicyCheck(txnId, guardrailResult) {
+  const rulesTriggered = (guardrailResult.failedGuardrails || []).map(g => ({
+    rule: g.guardrail,
+    reason: g.reason,
+  }))
+
+  const policyStatus = guardrailResult.passed ? 'PASSED'
+    : guardrailResult.requiresApproval ? 'APPROVAL_REQUIRED'
+    : 'BLOCKED'
+
+  const explanation = guardrailResult.passed
+    ? `Policy check passed. Action "${guardrailResult.requestedAction}" is allowed.`
+    : guardrailResult.requiresApproval
+      ? `Action "${guardrailResult.requestedAction}" requires human approval. ${rulesTriggered.map(r => r.reason).join(' ')}`
+      : `Action "${guardrailResult.requestedAction}" blocked by policy. ${rulesTriggered.map(r => r.reason).join(' ')}`
+
   const record = {
     auditId: generateAuditId(),
     timestamp: new Date().toISOString(),
     transactionId: txnId,
     eventType: 'POLICY_CHECK',
     action: guardrailResult.requestedAction,
-    status: guardrailResult.passed ? 'PASSED' : 'BLOCKED',
+    status: policyStatus,
     details: {
-      passed: guardrailResult.passed,
-      allowedAction: guardrailResult.allowedAction,
+      policyStatus,
+      requestedAction: guardrailResult.requestedAction,
+      finalAction: guardrailResult.allowedAction,
       requiresApproval: guardrailResult.requiresApproval,
+      passed: guardrailResult.passed,
+      rulesTriggered,
+      explanation,
       failedGuardrails: guardrailResult.failedGuardrails,
       checks: guardrailResult.checks,
       policy: guardrailResult.policy,
@@ -145,4 +211,23 @@ export function getAllAuditLogs() {
 export function getAuditLogsByTxnId(txnId) {
   const logs = readAuditLogs()
   return logs.filter(log => log.transactionId === txnId)
+}
+
+export function recordRecoveryResult(txnId, recoveryResult) {
+  const record = {
+    auditId: generateAuditId(),
+    timestamp: new Date().toISOString(),
+    transactionId: txnId,
+    eventType: 'RECOVERY_RESULT',
+    action: recoveryResult.action || 'Unknown',
+    status: recoveryResult.status,
+    details: {
+      status: recoveryResult.status,
+      executed: recoveryResult.executed,
+      message: recoveryResult.message,
+      recoveredAmount: recoveryResult.recoveredAmount || 0,
+    },
+  }
+  addAuditRecord(record)
+  return record
 }

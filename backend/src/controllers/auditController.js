@@ -1,5 +1,5 @@
 import { getAllAuditLogs, getAuditLogsByTxnId } from '../services/auditService.js'
-import { guardrails } from '../data/apiData.js'
+import { getGuardrailConfig } from '../services/guardrailConfigStore.js'
 
 export const getAuditTrail = (req, res) => {
   const logs = getAllAuditLogs()
@@ -20,9 +20,23 @@ export const getAuditByTxnId = (req, res) => {
 }
 
 export const getGuardrails = (req, res) => {
+  const config = getGuardrailConfig()
+  if (!config || !config.rules) {
+    return res.json({ success: true, count: 0, data: [] })
+  }
+
+  const rules = Object.entries(config.rules).map(([key, rule]) => ({
+    id: key,
+    name: rule.name,
+    description: rule.description,
+    limit: rule.value,
+    status: rule.enabled ? 'Active' : 'Inactive',
+    unit: rule.unit,
+  }))
+
   res.json({
     success: true,
-    count: guardrails.length,
-    data: guardrails,
+    count: rules.length,
+    data: rules,
   })
 }

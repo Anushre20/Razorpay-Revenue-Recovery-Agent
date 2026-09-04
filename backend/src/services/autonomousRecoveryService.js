@@ -4,9 +4,12 @@ import { getRecoveryDecision } from './recoveryService.js'
 import { checkGuardrails } from './guardrailService.js'
 import { executeRecovery } from './executionService.js'
 import {
+  recordDetected,
+  recordDiagnosed,
   recordAIDecision,
   recordPolicyCheck,
   recordActionResult,
+  recordRecoveryResult,
 } from './auditService.js'
 import {
   createRun,
@@ -119,6 +122,8 @@ async function stageDetect(runId, transaction) {
       failureReason: transaction.failureReason,
     },
   })
+
+  recordDetected(transaction.id, transaction)
 }
 
 async function stageDiagnose(runId, txnId, transaction) {
@@ -138,6 +143,9 @@ async function stageDiagnose(runId, txnId, transaction) {
         mlPrediction: diagnosis.mlPrediction,
       },
     })
+
+    recordDiagnosed(txnId, diagnosis)
+
     return diagnosis
   } catch (err) {
     updateStage(runId, 'diagnose', {
@@ -193,17 +201,33 @@ async function stagePolicy(runId, txnId, decision) {
   try {
     const guardrailResult = checkGuardrails(txnId, decision.initialAction)
 
+    const rulesTriggered = (guardrailResult.failedGuardrails || []).map(g => ({
+      rule: g.guardrail,
+      reason: g.reason,
+    }))
+
+    const explanation = guardrailResult.passed
+      ? `Policy check passed. Action "${guardrailResult.requestedAction}" is allowed.`
+      : guardrailResult.requiresApproval
+        ? `Action "${guardrailResult.requestedAction}" requires human approval. ${rulesTriggered.map(r => r.reason).join(' ')}`
+        : `Action "${guardrailResult.requestedAction}" blocked by policy. ${rulesTriggered.map(r => r.reason).join(' ')}`
+
     recordPolicyCheck(txnId, guardrailResult)
 
     if (!guardrailResult.passed && guardrailResult.requiresApproval) {
       updateStage(runId, 'policy', {
         status: 'APPROVAL_REQUIRED',
         result: {
+          policyStatus: 'APPROVAL_REQUIRED',
           passed: false,
+          requestedAction: guardrailResult.requestedAction,
           allowedAction: guardrailResult.allowedAction,
+          finalAction: guardrailResult.allowedAction,
           requiresApproval: true,
           failedGuardrails: guardrailResult.failedGuardrails,
-          message: 'Action requires human approval',
+          rulesTriggered,
+          explanation,
+          message: explanation,
         },
       })
       return { ...guardrailResult, status: 'APPROVAL_REQUIRED' }
@@ -213,11 +237,16 @@ async function stagePolicy(runId, txnId, decision) {
       updateStage(runId, 'policy', {
         status: 'BLOCKED',
         result: {
+          policyStatus: 'BLOCKED',
           passed: false,
+          requestedAction: guardrailResult.requestedAction,
           allowedAction: guardrailResult.allowedAction,
+          finalAction: guardrailResult.allowedAction,
           requiresApproval: false,
           failedGuardrails: guardrailResult.failedGuardrails,
-          message: `Blocked: ${guardrailResult.failedGuardrails.map(g => g.reason).join('; ')}`,
+          rulesTriggered,
+          explanation,
+          message: explanation,
         },
       })
       return { ...guardrailResult, status: 'BLOCKED' }
@@ -226,10 +255,15 @@ async function stagePolicy(runId, txnId, decision) {
     updateStage(runId, 'policy', {
       status: 'COMPLETED',
       result: {
+        policyStatus: 'PASSED',
         passed: true,
+        requestedAction: guardrailResult.requestedAction,
         allowedAction: guardrailResult.allowedAction,
+        finalAction: guardrailResult.allowedAction,
         requiresApproval: guardrailResult.requiresApproval,
-        message: 'Policy check passed',
+        rulesTriggered: [],
+        explanation,
+        message: explanation,
       },
     })
     return { ...guardrailResult, status: 'APPROVED' }
@@ -322,6 +356,8 @@ async function stageRecover(runId, txnId, executionResult) {
     result: recoveryResult,
   })
 
+  recordRecoveryResult(txnId, recoveryResult)
+
   return recoveryResult
 }
 
@@ -329,14 +365,25 @@ async function stageAudit(runId, txnId, decision, policyResult, executionResult,
   updateStage(runId, 'audit', { status: 'RUNNING' })
 
   try {
+    const policyStatus = policyResult.passed ? 'PASSED'
+      : policyResult.requiresApproval ? 'APPROVAL_REQUIRED'
+      : 'BLOCKED'
+
     const auditRecord = {
       agentRunId: runId,
       transactionId: txnId,
       aiRecommendation: decision.initialAction,
+      policyStatus,
       policyResult: policyResult.passed ? 'APPROVED' : 'BLOCKED',
       finalAction: policyResult.allowedAction,
+      requestedAction: policyResult.requestedAction || decision.initialAction,
+      requiresApproval: policyResult.requiresApproval,
       executionStatus: executionResult?.status || 'NOT_STARTED',
       recoveryStatus: recoveryStatus || 'NOT_STARTED',
+      rulesTriggered: policyResult.failedGuardrails?.map(g => g.guardrail) || [],
+      explanation: policyResult.passed
+        ? `AI recommended "${decision.initialAction}". Policy passed. Action "${policyResult.allowedAction}" executed.`
+        : `AI recommended "${decision.initialAction}". Policy ${policyStatus}. ${policyResult.failedGuardrails?.map(g => g.reason).join(' ') || ''}`,
     }
 
     updateStage(runId, 'audit', {

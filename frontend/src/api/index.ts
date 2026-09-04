@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from './api';
+import { apiGet, apiPost, apiPut } from './api';
 
 // --- Transaction Types ---
 export interface Transaction {
@@ -366,6 +366,49 @@ export interface MLModelMetrics {
 
 export const fetchMLMetrics = () => apiGet<{ success: boolean; data: MLModelMetrics }>('/api/evaluation/ml-metrics');
 
+// --- Actual Recovery Performance Types ---
+export interface ActualRecoveryPerformance {
+  summary: {
+    totalAgentRuns: number;
+    completed: number;
+    running: number;
+    blocked: number;
+    humanApproval: number;
+    executionFailed: number;
+    failed: number;
+    rejected: number;
+  };
+  executions: {
+    successful: number;
+    failed: number;
+    notSupported: number;
+    total: number;
+  };
+  recovery: {
+    confirmedRecoveredAmount: number;
+    pendingRecoveries: number;
+    recoveryRate: number | null;
+    totalExecutedAmount: number;
+    simulatedRecoveredAmount: number;
+  };
+  policy: {
+    guardrailBlocked: number;
+    approvalRequired: number;
+    policyPassed: number;
+    totalPolicyChecks: number;
+  };
+  dataAvailability: {
+    liveCount: number;
+    demoCount: number;
+    razorpayCount: number;
+    historicalCount: number;
+    hasLive: boolean;
+  };
+  sources: string[];
+}
+
+export const fetchActualRecoveryPerformance = () => apiGet<{ success: boolean; data: ActualRecoveryPerformance }>('/api/evaluation/actual-performance');
+
 // --- Integration Types ---
 export interface IntegrationStatus {
   success: boolean;
@@ -574,3 +617,30 @@ export interface MerchantIntelligence {
 }
 
 export const fetchMerchantIntelligence = () => apiGet<{ success: boolean; data: MerchantIntelligence }>('/api/merchant/intelligence');
+
+// --- Guardrail Config Types ---
+export interface GuardrailRuleConfig {
+  value: number;
+  enabled: boolean;
+  name: string;
+  description: string;
+  unit: string;
+}
+
+export interface GuardrailConfig {
+  rules: Record<string, GuardrailRuleConfig>;
+  lastUpdated: string | null;
+  updatedBy: string | null;
+}
+
+export interface GuardrailPreview {
+  ruleKey: string;
+  newValue: number;
+  affectedTransactions: number;
+}
+
+export const fetchGuardrailConfig = () => apiGet<{ success: boolean; data: GuardrailConfig }>('/api/guardrail-config');
+export const updateGuardrailConfig = (rules: Record<string, { value?: number; enabled?: boolean }>) =>
+  apiPut<{ success: boolean; data: GuardrailConfig }>('/api/guardrail-config', { rules });
+export const fetchGuardrailPreview = (ruleKey: string, value: number) =>
+  apiGet<{ success: boolean; data: GuardrailPreview }>(`/api/guardrail-config/preview?ruleKey=${ruleKey}&value=${value}`);

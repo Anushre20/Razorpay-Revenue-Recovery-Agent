@@ -1,5 +1,6 @@
 import { computeEvaluation } from '../services/evaluationService.js'
 import { getModelMetrics, isLoaded } from '../services/mlInferenceService.js'
+import { computeActualRecoveryPerformance } from '../services/actualRecoveryService.js'
 
 export const getEvaluation = (req, res) => {
   try {
@@ -37,6 +38,22 @@ export const getMLMetrics = (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve ML metrics',
+    })
+  }
+}
+
+export const getActualRecoveryPerformance = (req, res) => {
+  try {
+    const performance = computeActualRecoveryPerformance()
+    res.json({
+      success: true,
+      data: performance,
+    })
+  } catch (err) {
+    console.error('Actual recovery performance computation failed:', err.message)
+    res.status(500).json({
+      success: false,
+      message: 'Failed to compute actual recovery performance',
     })
   }
 }

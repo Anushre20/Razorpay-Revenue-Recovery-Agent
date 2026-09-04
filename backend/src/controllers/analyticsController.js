@@ -1,9 +1,17 @@
-import { analytics, merchants } from '../data/apiData.js'
+import { merchants } from '../data/apiData.js'
+import { computeEvaluation } from '../services/evaluationService.js'
 
 export const getAnalytics = (req, res) => {
+  const evaluation = computeEvaluation()
   res.json({
     success: true,
-    data: analytics,
+    data: {
+      totalAtRisk: evaluation.totalAtRisk,
+      totalRecovered: evaluation.totalRecovered,
+      recoveryRate: evaluation.recoveryRate,
+      successfulInterventions: evaluation.truePositives + evaluation.trueNegatives,
+      unnecessaryActions: evaluation.falsePositives,
+    },
   })
 }
 
@@ -16,12 +24,13 @@ export const getMerchants = (req, res) => {
 }
 
 export const getDashboard = (req, res) => {
+  const evaluation = computeEvaluation()
   res.json({
     success: true,
     data: {
-      totalAtRisk: analytics.totalAtRisk,
-      totalRecovered: analytics.totalRecovered,
-      recoveryRate: analytics.recoveryRate,
+      totalAtRisk: evaluation.totalAtRisk,
+      totalRecovered: evaluation.totalRecovered,
+      recoveryRate: evaluation.recoveryRate,
       failedPayments: 4850000,
       abandonedCheckouts: 3200000,
       subscriptionFailures: 2650000,

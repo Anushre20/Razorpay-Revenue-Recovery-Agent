@@ -663,12 +663,12 @@
     "agentRunId": "AGENT-1788534872000-xljrc",
     "transactionId": "TXN-2847020",
     "source": "manual",
-    "status": "HUMAN_APPROVAL_REQUIRED",
+    "status": "RUNNING",
     "currentStage": "POLICY",
     "stages": {
       "detect": {
         "status": "COMPLETED",
-        "timestamp": "2026-09-04T15:18:38.357Z",
+        "timestamp": "2026-09-04T16:33:50.267Z",
         "result": {
           "transactionId": "TXN-2847020",
           "source": "historical",
@@ -679,7 +679,7 @@
       },
       "diagnose": {
         "status": "COMPLETED",
-        "timestamp": "2026-09-04T15:18:38.363Z",
+        "timestamp": "2026-09-04T16:33:50.272Z",
         "result": {
           "problem": "Checkout was abandoned due to price changed",
           "rootCause": "Checkout amount changed before payment completion",
@@ -720,7 +720,7 @@
       },
       "decide": {
         "status": "COMPLETED",
-        "timestamp": "2026-09-04T15:18:38.364Z",
+        "timestamp": "2026-09-04T16:33:50.274Z",
         "result": {
           "aiRecommendation": "WhatsApp Reminder",
           "finalAction": "Human Escalation",
@@ -733,10 +733,13 @@
       },
       "policy": {
         "status": "APPROVAL_REQUIRED",
-        "timestamp": "2026-09-04T15:18:38.368Z",
+        "timestamp": "2026-09-04T16:33:50.277Z",
         "result": {
+          "policyStatus": "APPROVAL_REQUIRED",
           "passed": false,
+          "requestedAction": "WhatsApp Reminder",
           "allowedAction": "Human Escalation",
+          "finalAction": "Human Escalation",
           "requiresApproval": true,
           "failedGuardrails": [
             {
@@ -745,7 +748,14 @@
               "reason": "Automatic recovery blocked because transaction amount ₹80871 exceeds the ₹25000 limit."
             }
           ],
-          "message": "Action requires human approval"
+          "rulesTriggered": [
+            {
+              "rule": "Automatic Recovery Amount",
+              "reason": "Automatic recovery blocked because transaction amount ₹80871 exceeds the ₹25000 limit."
+            }
+          ],
+          "explanation": "Action \"WhatsApp Reminder\" requires human approval. Automatic recovery blocked because transaction amount ₹80871 exceeds the ₹25000 limit.",
+          "message": "Action \"WhatsApp Reminder\" requires human approval. Automatic recovery blocked because transaction amount ₹80871 exceeds the ₹25000 limit."
         }
       },
       "execute": {
@@ -759,7 +769,9 @@
       }
     },
     "startedAt": "2026-09-04T15:14:32.000Z",
-    "completedAt": "2026-09-04T15:18:38.368Z"
+    "completedAt": "2026-09-04T16:33:50.278Z",
+    "approvalDecision": "APPROVED",
+    "approvedAt": "2026-09-04T16:34:03.987Z"
   },
   {
     "agentRunId": "AGENT-1788535214348-k5d5u",
@@ -882,7 +894,7 @@
     "stages": {
       "detect": {
         "status": "COMPLETED",
-        "timestamp": "2026-09-04T15:23:25.133Z",
+        "timestamp": "2026-09-04T16:33:34.072Z",
         "result": {
           "transactionId": "DEMO-1788534554944",
           "source": "demo",
@@ -893,7 +905,7 @@
       },
       "diagnose": {
         "status": "COMPLETED",
-        "timestamp": "2026-09-04T15:23:25.136Z",
+        "timestamp": "2026-09-04T16:33:34.083Z",
         "result": {
           "problem": "Payment failed due to network error",
           "rootCause": "Temporary network or payment gateway connectivity issue",
@@ -935,7 +947,7 @@
       },
       "decide": {
         "status": "COMPLETED",
-        "timestamp": "2026-09-04T15:23:25.138Z",
+        "timestamp": "2026-09-04T16:33:34.088Z",
         "result": {
           "aiRecommendation": "Smart Retry",
           "finalAction": "Smart Retry",
@@ -948,17 +960,22 @@
       },
       "policy": {
         "status": "COMPLETED",
-        "timestamp": "2026-09-04T15:23:25.142Z",
+        "timestamp": "2026-09-04T16:33:34.092Z",
         "result": {
+          "policyStatus": "PASSED",
           "passed": true,
+          "requestedAction": "Smart Retry",
           "allowedAction": "Smart Retry",
+          "finalAction": "Smart Retry",
           "requiresApproval": false,
-          "message": "Policy check passed"
+          "rulesTriggered": [],
+          "explanation": "Policy check passed. Action \"Smart Retry\" is allowed.",
+          "message": "Policy check passed. Action \"Smart Retry\" is allowed."
         }
       },
       "execute": {
         "status": "COMPLETED",
-        "timestamp": "2026-09-04T15:23:25.444Z",
+        "timestamp": "2026-09-04T16:33:34.382Z",
         "result": {
           "executed": true,
           "status": "ORDER_CREATED",
@@ -966,13 +983,13 @@
           "provider": "Razorpay",
           "mode": "TEST",
           "amount": 2000,
-          "razorpayOrderId": "order_TY0Y0xSbpdBxkV",
+          "razorpayOrderId": "order_TY1k796dbA8hM1",
           "orderStatus": "created"
         }
       },
       "recover": {
         "status": "COMPLETED",
-        "timestamp": "2026-09-04T15:23:25.446Z",
+        "timestamp": "2026-09-04T16:33:34.384Z",
         "result": {
           "status": "PENDING",
           "executed": true,
@@ -982,20 +999,25 @@
       },
       "audit": {
         "status": "COMPLETED",
-        "timestamp": "2026-09-04T15:23:25.447Z",
+        "timestamp": "2026-09-04T16:33:34.388Z",
         "result": {
           "agentRunId": "AGENT-1788535405132-8a0bq",
           "transactionId": "DEMO-1788534554944",
           "aiRecommendation": "Smart Retry",
+          "policyStatus": "PASSED",
           "policyResult": "APPROVED",
           "finalAction": "Smart Retry",
+          "requestedAction": "Smart Retry",
+          "requiresApproval": false,
           "executionStatus": "ORDER_CREATED",
-          "recoveryStatus": "PENDING"
+          "recoveryStatus": "PENDING",
+          "rulesTriggered": [],
+          "explanation": "AI recommended \"Smart Retry\". Policy passed. Action \"Smart Retry\" executed."
         }
       }
     },
     "startedAt": "2026-09-04T15:23:25.132Z",
-    "completedAt": "2026-09-04T15:23:25.448Z"
+    "completedAt": "2026-09-04T16:33:34.390Z"
   },
   {
     "agentRunId": "AGENT-1788536829102-6v5u7",
@@ -1220,5 +1242,120 @@
     },
     "startedAt": "2026-09-04T16:05:58.598Z",
     "completedAt": "2026-09-04T16:05:58.617Z"
+  },
+  {
+    "agentRunId": "AGENT-1788539646090-3px3t",
+    "transactionId": "DEMO-1788539598152",
+    "source": "demo",
+    "status": "REJECTED",
+    "currentStage": "POLICY",
+    "stages": {
+      "detect": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T16:34:06.090Z",
+        "result": {
+          "transactionId": "DEMO-1788539598152",
+          "source": "demo",
+          "amount": 30000,
+          "type": "Failed Payment",
+          "failureReason": "Card Declined"
+        }
+      },
+      "diagnose": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T16:34:06.094Z",
+        "result": {
+          "problem": "Payment failed due to card declined",
+          "rootCause": "Issuing bank declined the card transaction",
+          "recoverability": 51,
+          "riskScore": 45,
+          "recommendedAction": "WhatsApp Reminder",
+          "confidence": 66,
+          "mlPrediction": {
+            "mlAvailable": true,
+            "recoverability": {
+              "prediction": "recoverable",
+              "probability": 0.5138
+            },
+            "riskScore": {
+              "prediction": 45
+            },
+            "action": {
+              "prediction": "WhatsApp Reminder",
+              "confidence": 0.66,
+              "probabilities": {
+                "Card Update Request": 0.0958,
+                "Email Reminder": 0.0856,
+                "Human Escalation": 0.0388,
+                "No Action": 0.065,
+                "Payment Link": 0.039,
+                "Smart Retry": 0.0051,
+                "UPI Fallback": 0.0096,
+                "WhatsApp Reminder": 0.6611
+              }
+            },
+            "reasoning": [
+              "High recovery potential (51% probability)",
+              "Moderate risk score",
+              "May benefit from alternative payment method",
+              "ML confidence in action: 66%"
+            ]
+          }
+        }
+      },
+      "decide": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T16:34:06.097Z",
+        "result": {
+          "aiRecommendation": "WhatsApp Reminder",
+          "finalAction": "Human Escalation",
+          "reason": "ML recommended \"WhatsApp Reminder\" but guardrails changed it to \"Human Escalation\": Automatic recovery blocked because transaction amount ₹30000 exceeds the ₹25000 limit.",
+          "recoverability": 51,
+          "riskScore": 45,
+          "confidence": 0.66,
+          "mlAction": "WhatsApp Reminder"
+        }
+      },
+      "policy": {
+        "status": "APPROVAL_REQUIRED",
+        "timestamp": "2026-09-04T16:34:06.099Z",
+        "result": {
+          "policyStatus": "APPROVAL_REQUIRED",
+          "passed": false,
+          "requestedAction": "WhatsApp Reminder",
+          "allowedAction": "Human Escalation",
+          "finalAction": "Human Escalation",
+          "requiresApproval": true,
+          "failedGuardrails": [
+            {
+              "passed": false,
+              "guardrail": "Automatic Recovery Amount",
+              "reason": "Automatic recovery blocked because transaction amount ₹30000 exceeds the ₹25000 limit."
+            }
+          ],
+          "rulesTriggered": [
+            {
+              "rule": "Automatic Recovery Amount",
+              "reason": "Automatic recovery blocked because transaction amount ₹30000 exceeds the ₹25000 limit."
+            }
+          ],
+          "explanation": "Action \"WhatsApp Reminder\" requires human approval. Automatic recovery blocked because transaction amount ₹30000 exceeds the ₹25000 limit.",
+          "message": "Action \"WhatsApp Reminder\" requires human approval. Automatic recovery blocked because transaction amount ₹30000 exceeds the ₹25000 limit."
+        }
+      },
+      "execute": {
+        "status": "PENDING"
+      },
+      "recover": {
+        "status": "PENDING"
+      },
+      "audit": {
+        "status": "PENDING"
+      }
+    },
+    "startedAt": "2026-09-04T16:34:06.090Z",
+    "completedAt": "2026-09-04T16:34:08.180Z",
+    "approvalDecision": "REJECTED",
+    "rejectedAt": "2026-09-04T16:34:08.180Z"
   }
 ]

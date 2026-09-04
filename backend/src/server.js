@@ -11,6 +11,7 @@ import evaluationRoutes from './routes/evaluationRoutes.js'
 import integrationRoutes from './routes/integrationRoutes.js'
 import agentRoutes from './routes/agentRoutes.js'
 import merchantRoutes from './routes/merchantRoutes.js'
+import guardrailConfigRoutes from './routes/guardrailConfigRoutes.js'
 import { loadModels } from './services/mlInferenceService.js'
 
 dotenv.config()
@@ -30,6 +31,7 @@ app.use('/api/evaluation', evaluationRoutes)
 app.use('/api/integration', integrationRoutes)
 app.use('/api/agent', agentRoutes)
 app.use('/api/merchant', merchantRoutes)
+app.use('/api/guardrail-config', guardrailConfigRoutes)
 
 app.get('/', (req, res) => {
   res.json({

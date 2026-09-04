@@ -17,7 +17,11 @@ import {
   fetchIntegrationStatus, syncRazorpayTransactions, evaluateTransaction,
   fetchMLMetrics, fetchAgentRuns, fetchAgentRunForTxn, triggerAgentRecovery,
   fetchAgentStats, approveAgentRun, rejectAgentRun,
-  fetchMerchantIntelligence
+  fetchMerchantIntelligence,
+  fetchGuardrailConfig, updateGuardrailConfig, fetchGuardrailPreview,
+  type GuardrailConfig, type GuardrailRuleConfig,
+  fetchAuditByTxn,
+  fetchActualRecoveryPerformance, type ActualRecoveryPerformance
 } from "./api";
 
 
@@ -1424,24 +1428,179 @@ function AgentView() {
             })}
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-3">
             {stageConfig.map(step => {
               const stage = selectedRun.stages?.[step.key as keyof typeof selectedRun.stages];
               if (!stage || (!stage.result && !stage.error)) return null;
+              const result = stage.result as any;
+              const isBlocked = stage.status === 'BLOCKED' || stage.status === 'APPROVAL_REQUIRED';
+              const isCompleted = stage.status === 'COMPLETED';
+
               return (
                 <details key={step.key} className="group">
                   <summary className="cursor-pointer text-[11px] text-gray-400 hover:text-gray-200 flex items-center gap-2">
                     <span className="group-open:rotate-90 transition-transform text-[10px]">&#9654;</span>
-                    {step.label}
-                    <span className={`text-[9px] font-mono ${stage.status === 'COMPLETED' ? 'text-emerald-400' : stage.status === 'BLOCKED' || stage.status === 'APPROVAL_REQUIRED' ? 'text-amber-400' : stage.status === 'FAILED' ? 'text-red-400' : 'text-gray-500'}`}>
+                    {step.icon} {step.label}
+                    <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${
+                      isCompleted ? 'text-emerald-400 bg-emerald-500/10' :
+                      isBlocked ? 'text-amber-400 bg-amber-500/10' :
+                      stage.status === 'FAILED' ? 'text-red-400 bg-red-500/10' :
+                      stage.status === 'RUNNING' ? 'text-[#3B82F6] bg-[#2563EB]/10' :
+                      'text-gray-500'
+                    }`}>
                       {stage.status}
                     </span>
+                    {step.key === 'policy' && result?.policyStatus && (
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                        result.policyStatus === 'PASSED' ? 'text-emerald-400 bg-emerald-500/10' :
+                        result.policyStatus === 'BLOCKED' ? 'text-red-400 bg-red-500/10' :
+                        'text-amber-400 bg-amber-500/10'
+                      }`}>
+                        {result.policyStatus === 'PASSED' ? 'POLICY PASSED' :
+                         result.policyStatus === 'BLOCKED' ? 'AI STOPPED' :
+                         'AI PAUSED'}
+                      </span>
+                    )}
                   </summary>
-                  {stage.error && <p className="text-[10px] text-red-400 mt-1">{stage.error}</p>}
-                  {stage.result && (
-                    <pre className="mt-2 p-3 bg-[#090E1A] rounded-lg border border-[#1E2D45] text-[10px] text-gray-400 overflow-x-auto max-h-48 overflow-y-auto">
-                      {JSON.stringify(stage.result, null, 2)}
-                    </pre>
+
+                  {stage.error && <p className="text-[10px] text-red-400 mt-1 ml-4">{stage.error}</p>}
+
+                  {step.key === 'detect' && result && (
+                    <div className="mt-2 ml-4 p-3 bg-[#090E1A] rounded-lg border border-[#1E2D45] space-y-1">
+                      <p className="text-[10px] text-gray-500">Transaction Detected</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div><span className="text-[9px] text-gray-600">Amount: </span><span className="text-[10px] text-white font-mono">₹{result.amount}</span></div>
+                        <div><span className="text-[9px] text-gray-600">Source: </span><span className="text-[10px] text-gray-300">{result.source}</span></div>
+                        <div><span className="text-[9px] text-gray-600">Type: </span><span className="text-[10px] text-gray-300">{result.type}</span></div>
+                        <div><span className="text-[9px] text-gray-600">Failure: </span><span className="text-[10px] text-gray-300">{result.failureReason}</span></div>
+                      </div>
+                    </div>
+                  )}
+
+                  {step.key === 'diagnose' && result && (
+                    <div className="mt-2 ml-4 p-3 bg-[#090E1A] rounded-lg border border-[#1E2D45] space-y-1">
+                      <p className="text-[10px] text-gray-500">Diagnosis</p>
+                      <div><span className="text-[9px] text-gray-600">Problem: </span><span className="text-[10px] text-gray-300">{result.problem}</span></div>
+                      <div><span className="text-[9px] text-gray-600">Root Cause: </span><span className="text-[10px] text-gray-300">{result.rootCause}</span></div>
+                      <div className="grid grid-cols-3 gap-2 mt-1">
+                        <div><span className="text-[9px] text-gray-600">Recoverability: </span><span className="text-[10px] text-white font-mono">{result.recoverability}%</span></div>
+                        <div><span className="text-[9px] text-gray-600">Risk Score: </span><span className="text-[10px] text-white font-mono">{result.riskScore}</span></div>
+                        <div><span className="text-[9px] text-gray-600">Confidence: </span><span className="text-[10px] text-white font-mono">{result.confidence}%</span></div>
+                      </div>
+                      {result.mlPrediction?.mlAvailable && (
+                        <div className="mt-1"><span className="text-[9px] text-[#A78BFA]">ML Prediction: </span><span className="text-[10px] text-[#A78BFA]">{result.mlPrediction.action?.prediction} ({(result.mlPrediction.action?.confidence * 100).toFixed(0)}%)</span></div>
+                      )}
+                    </div>
+                  )}
+
+                  {step.key === 'decide' && result && (
+                    <div className="mt-2 ml-4 p-3 bg-[#090E1A] rounded-lg border border-[#1E2D45] space-y-1">
+                      <p className="text-[10px] text-gray-500">AI Decision</p>
+                      <div><span className="text-[9px] text-gray-600">Recommendation: </span><span className="text-[10px] text-[#A78BFA] font-medium">{result.aiRecommendation}</span></div>
+                      <div><span className="text-[9px] text-gray-600">Why: </span><span className="text-[10px] text-gray-300">{result.reason}</span></div>
+                      <div className="grid grid-cols-3 gap-2 mt-1">
+                        <div><span className="text-[9px] text-gray-600">Confidence: </span><span className="text-[10px] text-white font-mono">{result.confidence ? `${(result.confidence * 100).toFixed(0)}%` : 'N/A'}</span></div>
+                        <div><span className="text-[9px] text-gray-600">Recoverability: </span><span className="text-[10px] text-white font-mono">{result.recoverability}%</span></div>
+                        <div><span className="text-[9px] text-gray-600">Risk: </span><span className="text-[10px] text-white font-mono">{result.riskScore}</span></div>
+                      </div>
+                    </div>
+                  )}
+
+                  {step.key === 'policy' && result && (
+                    <div className="mt-2 ml-4 p-3 bg-[#090E1A] rounded-lg border border-[#1E2D45] space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[10px] font-bold px-2 py-1 rounded ${
+                          result.policyStatus === 'PASSED' ? 'text-emerald-400 bg-emerald-500/10' :
+                          result.policyStatus === 'BLOCKED' ? 'text-red-400 bg-red-500/10' :
+                          'text-amber-400 bg-amber-500/10'
+                        }`}>
+                          {result.policyStatus === 'PASSED' ? 'POLICY PASSED — EXECUTION ALLOWED' :
+                           result.policyStatus === 'BLOCKED' ? 'AI STOPPED — POLICY BLOCKED' :
+                           'AI PAUSED — HUMAN APPROVAL REQUIRED'}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div><span className="text-[9px] text-gray-600">Requested: </span><span className="text-[10px] text-gray-300">{result.requestedAction}</span></div>
+                        <div><span className="text-[9px] text-gray-600">Allowed: </span><span className="text-[10px] text-white font-medium">{result.finalAction || result.allowedAction}</span></div>
+                        <div><span className="text-[9px] text-gray-600">Approval Required: </span><span className={`text-[10px] ${result.requiresApproval ? 'text-amber-400' : 'text-emerald-400'}`}>{result.requiresApproval ? 'Yes' : 'No'}</span></div>
+                      </div>
+                      {result.explanation && (
+                        <div className="mt-1 p-2 bg-[#1A2332] rounded border border-[#1E2D45]">
+                          <span className="text-[9px] text-gray-600">Explanation: </span>
+                          <span className="text-[10px] text-gray-300">{result.explanation}</span>
+                        </div>
+                      )}
+                      {result.rulesTriggered && result.rulesTriggered.length > 0 && (
+                        <div className="mt-1">
+                          <span className="text-[9px] text-gray-600">Rules Triggered:</span>
+                          {result.rulesTriggered.map((r: any, i: number) => (
+                            <div key={i} className="ml-2 mt-1 p-2 bg-red-500/5 rounded border border-red-500/10">
+                              <span className="text-[10px] text-red-400 font-medium">{r.rule}: </span>
+                              <span className="text-[10px] text-gray-400">{r.reason}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {step.key === 'execute' && result && (
+                    <div className="mt-2 ml-4 p-3 bg-[#090E1A] rounded-lg border border-[#1E2D45] space-y-1">
+                      <p className="text-[10px] text-gray-500">Execution</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div><span className="text-[9px] text-gray-600">Action: </span><span className="text-[10px] text-white">{result.action}</span></div>
+                        <div><span className="text-[9px] text-gray-600">Status: </span><span className={`text-[10px] font-medium ${result.executed ? 'text-emerald-400' : result.status === 'NOT_SUPPORTED' ? 'text-gray-400' : 'text-amber-400'}`}>{result.status}</span></div>
+                        {result.provider && <div><span className="text-[9px] text-gray-600">Provider: </span><span className="text-[10px] text-gray-300">{result.provider} ({result.mode})</span></div>}
+                        {result.razorpayPaymentLinkId && <div><span className="text-[9px] text-gray-600">Payment Link ID: </span><span className="text-[10px] text-[#3B82F6] font-mono">{result.razorpayPaymentLinkId}</span></div>}
+                        {result.shortUrl && <div className="col-span-2"><span className="text-[9px] text-gray-600">URL: </span><span className="text-[10px] text-[#3B82F6] break-all">{result.shortUrl}</span></div>}
+                        {result.razorpayOrderId && <div><span className="text-[9px] text-gray-600">Order ID: </span><span className="text-[10px] text-[#3B82F6] font-mono">{result.razorpayOrderId}</span></div>}
+                        {result.orderStatus && <div><span className="text-[9px] text-gray-600">Order Status: </span><span className="text-[10px] text-gray-300">{result.orderStatus}</span></div>}
+                        {result.reason && <div className="col-span-2"><span className="text-[9px] text-gray-600">Reason: </span><span className="text-[10px] text-gray-400">{result.reason}</span></div>}
+                      </div>
+                    </div>
+                  )}
+
+                  {step.key === 'recover' && result && (
+                    <div className="mt-2 ml-4 p-3 bg-[#090E1A] rounded-lg border border-[#1E2D45] space-y-1">
+                      <p className="text-[10px] text-gray-500">Recovery Result</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div><span className="text-[9px] text-gray-600">Status: </span><span className={`text-[10px] font-medium ${
+                          result.status === 'PENDING' ? 'text-amber-400' :
+                          result.status === 'NOT_STARTED' ? 'text-gray-400' :
+                          'text-gray-300'
+                        }`}>{result.status}</span></div>
+                        <div><span className="text-[9px] text-gray-600">Action: </span><span className="text-[10px] text-gray-300">{result.action}</span></div>
+                      </div>
+                      <div className="mt-1 p-2 bg-[#1A2332] rounded border border-[#1E2D45]">
+                        <span className="text-[10px] text-gray-400">{result.message}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {step.key === 'audit' && result && (
+                    <div className="mt-2 ml-4 p-3 bg-[#090E1A] rounded-lg border border-[#1E2D45] space-y-1">
+                      <p className="text-[10px] text-gray-500">Audit Summary</p>
+                      {result.explanation && (
+                        <div className="p-2 bg-[#1A2332] rounded border border-[#1E2D45]">
+                          <span className="text-[10px] text-gray-300">{result.explanation}</span>
+                        </div>
+                      )}
+                      <div className="grid grid-cols-3 gap-2 mt-1">
+                        <div><span className="text-[9px] text-gray-600">Policy: </span><span className={`text-[10px] font-medium ${result.policyStatus === 'PASSED' ? 'text-emerald-400' : 'text-amber-400'}`}>{result.policyStatus || result.policyResult}</span></div>
+                        <div><span className="text-[9px] text-gray-600">Execution: </span><span className="text-[10px] text-gray-300">{result.executionStatus}</span></div>
+                        <div><span className="text-[9px] text-gray-600">Recovery: </span><span className="text-[10px] text-gray-300">{result.recoveryStatus}</span></div>
+                      </div>
+                      {result.rulesTriggered && result.rulesTriggered.length > 0 && (
+                        <div className="mt-1">
+                          <span className="text-[9px] text-gray-600">Rules Triggered: </span>
+                          <span className="text-[10px] text-amber-400">{result.rulesTriggered.join(', ')}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {!stage.result && !stage.error && (
+                    <p className="mt-1 ml-4 text-[10px] text-gray-600">No data for this stage</p>
                   )}
                 </details>
               );
@@ -1453,42 +1612,252 @@ function AgentView() {
   );
 }
 
-function GuardrailsView() {
+function GuardrailsView({ onNavigate }: { onNavigate: (n: NavItem) => void }) {
   const { data: guardrailsData, loading: gLoading, error: gError, retry: gRetry } = useApiData(fetchAuditGuardrails);
+  const { data: configData, loading: cLoading, error: cError, retry: cRetry } = useApiData(fetchGuardrailConfig);
   const { data: auditData } = useApiData(fetchAuditTrail);
 
   const guardrailRules = guardrailsData?.data || [];
   const auditLogs = auditData?.data || [];
-  const blockedLogs = auditLogs.filter(l => l.eventType === 'POLICY_CHECK' && l.status === 'BLOCKED');
+  const blockedLogs = auditLogs.filter(l => l.eventType === 'POLICY_CHECK' && (l.status === 'BLOCKED' || l.status === 'APPROVAL_REQUIRED'));
+  const config = configData?.data;
 
-  const categories = [...new Set(guardrailRules.map((g) => g.name.split(' ')[0]))];
+  const [editingRule, setEditingRule] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [previewCount, setPreviewCount] = useState<number | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [expandedBlocked, setExpandedBlocked] = useState<string | null>(null);
+  const [blockedDetails, setBlockedDetails] = useState<Record<string, any>>({});
 
-  if (gLoading) return <LoadingSpinner />;
-  if (gError) return <ErrorMessage message={gError} onRetry={gRetry} />;
+  const startEdit = (ruleKey: string, currentValue: number) => {
+    setEditingRule(ruleKey);
+    setEditValue(String(currentValue));
+    setSaveSuccess(null);
+    setSaveError(null);
+    setPreviewCount(null);
+  };
+
+  const cancelEdit = () => {
+    setEditingRule(null);
+    setEditValue('');
+    setPreviewCount(null);
+  };
+
+  const handleValueChange = async (ruleKey: string, value: string) => {
+    setEditValue(value);
+    const numVal = Number(value);
+    if (!isNaN(numVal) && numVal >= 0) {
+      setPreviewLoading(true);
+      try {
+        const res = await fetchGuardrailPreview(ruleKey, numVal);
+        setPreviewCount(res.data.affectedTransactions);
+      } catch {
+        setPreviewCount(null);
+      } finally {
+        setPreviewLoading(false);
+      }
+    } else {
+      setPreviewCount(null);
+    }
+  };
+
+  const saveRule = async (ruleKey: string) => {
+    const numVal = Number(editValue);
+    if (isNaN(numVal) || numVal < 0) {
+      setSaveError('Value must be a non-negative number');
+      return;
+    }
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await updateGuardrailConfig({ [ruleKey]: { value: numVal } });
+      setSaveSuccess(ruleKey);
+      setEditingRule(null);
+      gRetry();
+      cRetry();
+      setTimeout(() => setSaveSuccess(null), 3000);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleRule = async (ruleKey: string, currentEnabled: boolean) => {
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await updateGuardrailConfig({ [ruleKey]: { enabled: !currentEnabled } });
+      setSaveSuccess(ruleKey);
+      gRetry();
+      cRetry();
+      setTimeout(() => setSaveSuccess(null), 3000);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to toggle');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const loadBlockedDetails = async (auditLog: any) => {
+    const txnId = auditLog.transactionId;
+    if (blockedDetails[txnId]) {
+      setExpandedDetails(expandedBlocked === txnId ? null : txnId);
+      return;
+    }
+    try {
+      const res = await fetchAuditByTxn(txnId);
+      setBlockedDetails(prev => ({ ...prev, [txnId]: res.data }));
+      setExpandedBlocked(txnId);
+    } catch {
+      setExpandedBlocked(txnId);
+    }
+  };
+
+  const [expandedDetails, setExpandedDetails] = useState<string | null>(null);
+
+  if (gLoading || cLoading) return <LoadingSpinner />;
+  if (gError || cError) return <ErrorMessage message={gError || cError || ''} onRetry={() => { gRetry(); cRetry(); }} />;
 
   return (
     <div className="space-y-4 animate-fade-in">
       <div className="grid grid-cols-4 gap-4">
-        <StatCard label="Active Rules" value={String(guardrailRules.length)} sub="All guardrails armed" />
+        <StatCard label="Active Rules" value={String(guardrailRules.filter(r => r.status === 'Active').length)} sub="Guardrails armed" />
         <StatCard label="Triggered Today" value={String(auditLogs.filter(l => l.eventType === 'POLICY_CHECK').length)} sub="Rule enforcement events" />
         <StatCard label="Blocked Actions" value={String(blockedLogs.length)} sub="Prevented by policy" />
         <StatCard label="Escalations" value={String(auditLogs.filter(l => l.eventType === 'AI_DECISION' && l.action === 'Human Escalation').length)} sub="Sent to human review" />
       </div>
 
+      {saveSuccess && (
+        <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg flex items-center gap-2">
+          <span className="text-emerald-400">&#10003;</span>
+          <span className="text-xs text-emerald-400 font-medium">Policy updated successfully. Changes are now active.</span>
+        </div>
+      )}
+
+      {saveError && (
+        <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2">
+          <span className="text-red-400">!</span>
+          <span className="text-xs text-red-400">{saveError}</span>
+        </div>
+      )}
+
+      {config?.lastUpdated && (
+        <p className="text-[10px] text-gray-600">Last updated: {new Date(config.lastUpdated).toLocaleString()} by {config.updatedBy || 'system'}</p>
+      )}
+
       <div className="grid grid-cols-2 gap-4">
-        {guardrailRules.map((g) => (
-          <Card key={g.id} className="p-5">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-semibold text-gray-300 font-display">{g.name}</p>
-              <StatusBadge status={g.status} />
-            </div>
-            <p className="text-[11px] text-gray-200 leading-relaxed mb-2">{g.description}</p>
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-[10px] text-gray-500">{g.id}</span>
-              <span className="text-[10px] text-amber-400 font-mono">Limit: {g.limit.toLocaleString()}</span>
-            </div>
-          </Card>
-        ))}
+        {guardrailRules.map((g) => {
+          const ruleKey = g.id;
+          const isEditing = editingRule === ruleKey;
+          const ruleConfig = config?.rules?.[ruleKey];
+          const isEnabled = ruleConfig?.enabled ?? (g.status === 'Active');
+          const unit = ruleConfig?.unit || '';
+
+          return (
+            <Card key={g.id} className="p-5">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <p className="text-xs font-semibold text-gray-300 font-display">{g.name}</p>
+                  {saveSuccess === ruleKey && <span className="text-[9px] text-emerald-400 font-mono">SAVED</span>}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => toggleRule(ruleKey, isEnabled)}
+                    disabled={saving}
+                    className={`relative w-10 h-5 rounded-full transition-colors ${isEnabled ? 'bg-emerald-500' : 'bg-gray-600'}`}
+                  >
+                    <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${isEnabled ? 'left-5' : 'left-0.5'}`} />
+                  </button>
+                  <span className={`text-[10px] font-medium ${isEnabled ? 'text-emerald-400' : 'text-gray-500'}`}>
+                    {isEnabled ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-gray-200 leading-relaxed mb-3">{g.description}</p>
+
+              {isEditing ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-gray-500">Current limit:</span>
+                    <span className="text-[10px] text-amber-400 font-mono">{unit === 'INR' ? '₹' : ''}{g.limit.toLocaleString()}{unit === 'attempts' ? ' attempts' : unit === '%' ? '%' : ''}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-gray-500">New limit:</span>
+                    <div className="flex items-center gap-1">
+                      {unit === 'INR' && <span className="text-[10px] text-gray-400">₹</span>}
+                      <input
+                        type="number"
+                        value={editValue}
+                        onChange={(e) => handleValueChange(ruleKey, e.target.value)}
+                        className="w-28 bg-[#111827] border border-[#2563EB] rounded-lg px-2 py-1 text-xs text-white font-mono focus:outline-none"
+                        min="0"
+                      />
+                      {unit === 'attempts' && <span className="text-[10px] text-gray-400">attempts</span>}
+                      {unit === '%' && <span className="text-[10px] text-gray-400">%</span>}
+                    </div>
+                  </div>
+
+                  {previewLoading ? (
+                    <p className="text-[10px] text-gray-500">Calculating affected transactions...</p>
+                  ) : previewCount !== null ? (
+                    <div className="p-2 bg-amber-500/5 border border-amber-500/10 rounded-lg">
+                      <p className="text-[10px] text-amber-400">
+                        Changing this limit may affect currently restricted recovery opportunities.
+                      </p>
+                      <p className="text-[10px] text-gray-300 mt-1">
+                        {previewCount} transaction{previewCount !== 1 ? 's' : ''} currently exceed{previewCount === 1 ? 's' : ''} this limit.
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-gray-500">
+                      Changing this limit may affect currently restricted recovery opportunities.
+                    </p>
+                  )}
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => saveRule(ruleKey)}
+                      disabled={saving || !editValue}
+                      className="px-3 py-1.5 bg-[#2563EB] text-white text-[10px] font-medium rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                    >
+                      {saving && <span className="w-2.5 h-2.5 border border-white border-t-transparent rounded-full animate-spin" />}
+                      {saving ? 'Saving...' : 'Save Policy'}
+                    </button>
+                    <button
+                      onClick={cancelEdit}
+                      disabled={saving}
+                      className="px-3 py-1.5 bg-[#1A2332] text-gray-400 text-[10px] font-medium rounded-lg border border-[#1E2D45] hover:text-white transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[10px] text-gray-500">{g.id}</span>
+                    <span className="text-sm font-bold text-white font-mono">
+                      {unit === 'INR' ? '₹' : ''}{g.limit.toLocaleString()}{unit === 'attempts' ? '' : unit === '%' ? '%' : ''}
+                    </span>
+                    <span className="text-[10px] text-gray-500">{unit === 'INR' ? 'limit' : unit === 'attempts' ? 'max' : 'min'}</span>
+                  </div>
+                  <button
+                    onClick={() => startEdit(ruleKey, g.limit)}
+                    disabled={!isEnabled}
+                    className="px-3 py-1.5 bg-[#1A2332] border border-[#1E2D45] rounded-lg text-[10px] text-gray-400 hover:text-white hover:border-[#2563EB] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    Edit
+                  </button>
+                </div>
+              )}
+            </Card>
+          );
+        })}
       </div>
 
       <Card className="p-5">
@@ -1496,28 +1865,109 @@ function GuardrailsView() {
         {blockedLogs.length === 0 ? (
           <p className="text-xs text-gray-500 py-4 text-center">No blocked actions recorded yet. Trigger guardrail checks to see blocked actions here.</p>
         ) : (
-          <table className="w-full">
-            <thead>
-              <tr className="text-[10px] text-gray-500 uppercase tracking-wider border-b border-[#1E2D45]">
-                <th className="text-left pb-2.5">Audit ID</th>
-                <th className="text-left pb-2.5">Timestamp</th>
-                <th className="text-left pb-2.5">TXN ID</th>
-                <th className="text-left pb-2.5">Blocked Action</th>
-                <th className="text-left pb-2.5">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {blockedLogs.map((b) => (
-                <tr key={b.auditId} className="table-row-hover border-b border-[#1E2D45]/40">
-                  <td className="py-3 font-mono text-[11px] text-[#3B82F6]">{b.auditId}</td>
-                  <td className="py-3 font-mono text-[10px] text-gray-500">{b.timestamp ? new Date(b.timestamp).toLocaleString() : ''}</td>
-                  <td className="py-3 font-mono text-[11px] text-gray-400">{b.transactionId}</td>
-                  <td className="py-3 text-xs text-gray-200">{b.action}</td>
-                  <td className="py-3"><StatusBadge status={b.status} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="space-y-2">
+            {blockedLogs.map((b) => {
+              const isExpanded = expandedDetails === b.transactionId;
+              const details = blockedDetails[b.transactionId];
+              return (
+                <div key={b.auditId} className="bg-[#1A2332] rounded-lg border border-[#1E2D45] overflow-hidden">
+                  <div
+                    onClick={() => loadBlockedDetails(b)}
+                    className="flex items-center gap-3 p-3 cursor-pointer table-row-hover"
+                  >
+                    <span className="text-[10px] text-gray-600 font-mono w-4">{isExpanded ? '▼' : '▶'}</span>
+                    <span className="font-mono text-[11px] text-gray-400 flex-shrink-0">{b.transactionId}</span>
+                    <span className="text-xs text-gray-200 flex-shrink-0">{b.action}</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded flex-shrink-0 ${b.status === 'BLOCKED' ? 'text-red-400 bg-red-500/10' : 'text-amber-400 bg-amber-500/10'}`}>
+                      {b.status}
+                    </span>
+                    <span className="text-[10px] text-gray-500 font-mono ml-auto flex-shrink-0">
+                      {b.timestamp ? new Date(b.timestamp).toLocaleTimeString() : ''}
+                    </span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onNavigate('audit');
+                      }}
+                      className="px-2 py-0.5 bg-[#2563EB]/10 text-[#3B82F6] text-[9px] font-medium rounded border border-[#2563EB]/20 hover:bg-[#2563EB]/20 transition-colors flex-shrink-0"
+                    >
+                      View Audit
+                    </button>
+                  </div>
+
+                  {isExpanded && (
+                    <div className="px-3 pb-3 border-t border-[#1E2D45]">
+                      <div className="grid grid-cols-2 gap-3 mt-3">
+                        <div>
+                          <span className="text-[9px] text-gray-600">Transaction ID: </span>
+                          <span className="text-[10px] text-gray-300 font-mono">{b.transactionId}</span>
+                        </div>
+                        <div>
+                          <span className="text-[9px] text-gray-600">Blocked Action: </span>
+                          <span className="text-[10px] text-gray-300">{b.action}</span>
+                        </div>
+                        <div>
+                          <span className="text-[9px] text-gray-600">Policy Status: </span>
+                          <span className={`text-[10px] font-medium ${b.status === 'BLOCKED' ? 'text-red-400' : 'text-amber-400'}`}>{b.status}</span>
+                        </div>
+                        <div>
+                          <span className="text-[9px] text-gray-600">Timestamp: </span>
+                          <span className="text-[10px] text-gray-300 font-mono">{b.timestamp ? new Date(b.timestamp).toLocaleString() : ''}</span>
+                        </div>
+                      </div>
+
+                      {(b.details as any)?.requestedAction && (
+                        <div className="mt-2 grid grid-cols-2 gap-3">
+                          <div>
+                            <span className="text-[9px] text-gray-600">Requested Action: </span>
+                            <span className="text-[10px] text-gray-300">{(b.details as any).requestedAction}</span>
+                          </div>
+                          <div>
+                            <span className="text-[9px] text-gray-600">Final Action: </span>
+                            <span className="text-[10px] text-white font-medium">{(b.details as any).finalAction}</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {(b.details as any)?.rulesTriggered && (b.details as any).rulesTriggered.length > 0 && (
+                        <div className="mt-2">
+                          <span className="text-[9px] text-gray-600">Rules Triggered:</span>
+                          {(b.details as any).rulesTriggered.map((r: any, i: number) => (
+                            <div key={i} className="ml-2 mt-1 p-2 bg-red-500/5 rounded border border-red-500/10">
+                              <span className="text-[10px] text-red-400 font-medium">{r.rule}: </span>
+                              <span className="text-[10px] text-gray-400">{r.reason}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {(b.details as any)?.explanation && (
+                        <div className="mt-2 p-2 bg-[#090E1A] rounded border border-[#1E2D45]">
+                          <span className="text-[9px] text-gray-600">Why It Was Blocked: </span>
+                          <span className="text-[10px] text-gray-300">{(b.details as any).explanation}</span>
+                        </div>
+                      )}
+
+                      {details && details.length > 0 && (
+                        <div className="mt-3">
+                          <span className="text-[9px] text-gray-600">Full Transaction Audit ({details.length} events):</span>
+                          <div className="mt-1 space-y-1">
+                            {details.slice(0, 10).map((event: any) => (
+                              <div key={event.auditId} className="flex items-center gap-2 text-[10px] font-mono">
+                                <span className="text-gray-600 w-16">{event.timestamp ? new Date(event.timestamp).toLocaleTimeString() : ''}</span>
+                                <span className={`w-24 ${event.eventType === 'POLICY_CHECK' ? 'text-amber-400' : event.eventType === 'AI_DECISION' ? 'text-[#A78BFA]' : 'text-gray-400'}`}>{event.eventType}</span>
+                                <span className="text-gray-500">{event.action}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         )}
       </Card>
     </div>
@@ -1528,19 +1978,54 @@ function AuditView() {
   const { data, loading, error, retry } = useApiData(fetchAuditTrail);
   const logs = data?.data || [];
   const [search, setSearch] = useState("");
-
-  const filtered = search
-    ? logs.filter((l) => l.transactionId.toLowerCase().includes(search.toLowerCase()) || l.auditId.toLowerCase().includes(search.toLowerCase()))
-    : logs;
+  const [selectedTxn, setSelectedTxn] = useState<string | null>(null);
+  const [txnLogs, setTxnLogs] = useState<AuditLog[] | null>(null);
+  const [loadingTxn, setLoadingTxn] = useState(false);
 
   const aiDecisions = logs.filter(l => l.eventType === 'AI_DECISION').length;
   const policyPasses = logs.filter(l => l.eventType === 'POLICY_CHECK' && l.status === 'PASSED').length;
   const escalations = logs.filter(l => l.eventType === 'AI_DECISION' && l.action === 'Human Escalation').length;
 
+  useEffect(() => {
+    if (selectedTxn) {
+      setLoadingTxn(true);
+      fetchAuditByTxn(selectedTxn).then(res => {
+        setTxnLogs(res.data);
+        setLoadingTxn(false);
+      }).catch(() => {
+        setTxnLogs([]);
+        setLoadingTxn(false);
+      });
+    }
+  }, [selectedTxn]);
+
+  const displayLogs = selectedTxn && txnLogs ? txnLogs : logs;
+
+  const sortedLogs = [...displayLogs].sort((a, b) =>
+    new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  );
+
+  const filtered = search
+    ? sortedLogs.filter((l) =>
+        l.transactionId.toLowerCase().includes(search.toLowerCase()) ||
+        l.auditId.toLowerCase().includes(search.toLowerCase())
+      )
+    : sortedLogs;
+
+  const handleSearch = () => {
+    if (search.trim()) {
+      setSelectedTxn(search.trim());
+    } else {
+      setSelectedTxn(null);
+      setTxnLogs(null);
+    }
+  };
+
   const handleExportCsv = () => {
-    if (filtered.length === 0) return;
+    const exportLogs = selectedTxn && txnLogs ? txnLogs : filtered;
+    if (exportLogs.length === 0) return;
     const headers = ["Audit ID", "Timestamp", "TXN ID", "Event Type", "Action", "Status", "Details"];
-    const rows = filtered.map((l) => {
+    const rows = exportLogs.map((l) => {
       let details = '';
       if (l.eventType === 'AI_DECISION' && (l.details as Record<string, unknown>)?.reason) details = String((l.details as Record<string, unknown>).reason);
       else if (l.eventType === 'POLICY_CHECK' && (l.details as Record<string, unknown>)?.passed !== undefined) details = (l.details as Record<string, unknown>).passed ? 'Passed' : 'Blocked';
@@ -1558,6 +2043,70 @@ function AuditView() {
     URL.revokeObjectURL(url);
   };
 
+  const eventTypeConfig: Record<string, { label: string; color: string; bg: string }> = {
+    DETECTED: { label: 'DETECTED', color: 'text-[#3B82F6]', bg: 'bg-[#2563EB]/10' },
+    DIAGNOSED: { label: 'DIAGNOSED', color: 'text-[#A78BFA]', bg: 'bg-[#7C3AED]/10' },
+    AI_DECISION: { label: 'AI_DECISION', color: 'text-[#F59E0B]', bg: 'bg-amber-500/10' },
+    POLICY_CHECK: { label: 'POLICY_CHECK', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+    ACTION_RESULT: { label: 'ACTION_RESULT', color: 'text-[#3B82F6]', bg: 'bg-[#2563EB]/10' },
+    RECOVERY_RESULT: { label: 'RECOVERY_RESULT', color: 'text-gray-300', bg: 'bg-gray-500/10' },
+    SIMULATION_RESULT: { label: 'SIMULATION', color: 'text-gray-400', bg: 'bg-gray-500/10' },
+  };
+
+  const renderEventDetails = (log: AuditLog) => {
+    const d = log.details as Record<string, any>
+    if (!d) return null
+
+    const keyPairs: { key: string; value: string; color?: string }[] = []
+
+    if (log.eventType === 'DETECTED') {
+      if (d.amount !== undefined) keyPairs.push({ key: 'amount', value: `₹${d.amount}` })
+      if (d.source) keyPairs.push({ key: 'source', value: d.source })
+      if (d.type) keyPairs.push({ key: 'type', value: d.type })
+      if (d.failureReason) keyPairs.push({ key: 'failure', value: d.failureReason })
+    } else if (log.eventType === 'DIAGNOSED') {
+      if (d.recoverability !== undefined) keyPairs.push({ key: 'recoverability', value: `${d.recoverability}%` })
+      if (d.riskScore !== undefined) keyPairs.push({ key: 'riskScore', value: String(d.riskScore) })
+      if (d.confidence !== undefined) keyPairs.push({ key: 'confidence', value: `${d.confidence}%` })
+      if (d.problem) keyPairs.push({ key: 'problem', value: d.problem })
+      if (d.rootCause) keyPairs.push({ key: 'rootCause', value: d.rootCause })
+    } else if (log.eventType === 'AI_DECISION') {
+      keyPairs.push({ key: 'action', value: log.action, color: 'text-[#A78BFA]' })
+      if (d.confidence !== undefined) keyPairs.push({ key: 'confidence', value: `${typeof d.confidence === 'number' ? (d.confidence * 100).toFixed(0) : d.confidence}%` })
+      if (d.recoverability !== undefined) keyPairs.push({ key: 'recoverability', value: `${d.recoverability}%` })
+      if (d.riskScore !== undefined) keyPairs.push({ key: 'riskScore', value: String(d.riskScore) })
+      if (d.amount !== undefined) keyPairs.push({ key: 'amount', value: `₹${d.amount}` })
+    } else if (log.eventType === 'POLICY_CHECK') {
+      const statusColor = d.policyStatus === 'PASSED' ? 'text-emerald-400' : d.policyStatus === 'BLOCKED' ? 'text-red-400' : 'text-amber-400'
+      keyPairs.push({ key: 'status', value: d.policyStatus || log.status, color: statusColor })
+      keyPairs.push({ key: 'execution', value: d.policyStatus === 'PASSED' ? 'ALLOWED' : d.policyStatus === 'BLOCKED' ? 'STOPPED' : 'PAUSED' })
+      if (d.requestedAction) keyPairs.push({ key: 'requested', value: d.requestedAction })
+      if (d.finalAction || d.allowedAction) keyPairs.push({ key: 'final', value: d.finalAction || d.allowedAction })
+      if (d.rulesTriggered && d.rulesTriggered.length > 0) {
+        d.rulesTriggered.forEach((r: any) => {
+          keyPairs.push({ key: 'rule', value: `${r.rule}: ${r.reason}`, color: 'text-red-400' })
+        })
+      }
+    } else if (log.eventType === 'ACTION_RESULT') {
+      if (d.provider) keyPairs.push({ key: 'provider', value: d.provider })
+      if (d.executed !== undefined) keyPairs.push({ key: 'executed', value: String(d.executed) })
+      keyPairs.push({ key: 'status', value: log.status })
+      if (d.razorpayPaymentLinkId) keyPairs.push({ key: 'paymentLinkId', value: d.razorpayPaymentLinkId })
+      if (d.razorpayOrderId) keyPairs.push({ key: 'orderId', value: d.razorpayOrderId })
+      if (d.shortUrl) keyPairs.push({ key: 'url', value: d.shortUrl })
+    } else if (log.eventType === 'RECOVERY_RESULT') {
+      keyPairs.push({ key: 'status', value: d.status || log.status })
+      if (d.message) keyPairs.push({ key: 'message', value: d.message })
+    }
+
+    return keyPairs.map(({ key, value, color }) => (
+      <span key={key} className="ml-6">
+        <span className="text-gray-600">{key}=</span>
+        <span className={color || 'text-gray-300'}>{value}</span>
+      </span>
+    ))
+  }
+
   if (loading) return <LoadingSpinner />;
   if (error) return <ErrorMessage message={error} onRetry={retry} />;
 
@@ -1570,67 +2119,92 @@ function AuditView() {
         <StatCard label="Avg Decision Time" value="1.3s" sub="End-to-end" />
       </div>
 
-      <Card className="p-5">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <p className="text-sm font-semibold font-display text-white">Audit Trail</p>
-            <p className="text-xs text-gray-500">Complete AI decision log with policy checks</p>
+      <div className="flex items-center gap-3">
+        <div className="flex-1 relative">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
+            className="w-full bg-[#1A2332] border border-[#1E2D45] rounded-lg px-3 py-2 text-xs text-gray-300 placeholder-gray-600 focus:outline-none focus:border-[#2563EB] font-mono"
+            placeholder="Enter Transaction ID (e.g. DEMO-1788534554944)..."
+          />
+        </div>
+        <button
+          onClick={handleSearch}
+          className="px-4 py-2 bg-[#2563EB] text-white text-xs rounded-lg hover:bg-blue-600 transition-colors font-medium"
+        >
+          Trace
+        </button>
+        {selectedTxn && (
+          <button
+            onClick={() => { setSelectedTxn(null); setTxnLogs(null); setSearch(''); }}
+            className="px-4 py-2 bg-[#1A2332] border border-[#1E2D45] text-gray-400 text-xs rounded-lg hover:text-white transition-colors"
+          >
+            Show All
+          </button>
+        )}
+        <button onClick={handleExportCsv} className="px-4 py-2 bg-[#1A2332] border border-[#1E2D45] rounded-lg text-xs text-gray-400 hover:text-white transition-colors">
+          Export CSV
+        </button>
+      </div>
+
+      {selectedTxn && (
+        <div className="flex items-center gap-2 text-[10px] text-gray-500">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#3B82F6] animate-pulse-dot" />
+          <span>Showing trace for</span>
+          <span className="font-mono text-[#3B82F6]">{selectedTxn}</span>
+          <span>({sortedLogs.length} events)</span>
+        </div>
+      )}
+
+      <Card className="p-0 overflow-hidden">
+        <div className="bg-[#090E1A] border-b border-[#1E2D45] px-5 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-gray-500 uppercase tracking-wider font-mono font-semibold">AGENT AUDIT STREAM</span>
+            <span className="text-[9px] text-gray-600 font-mono">Live execution trace</span>
           </div>
-          <div className="flex items-center gap-3">
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="bg-[#1A2332] border border-[#1E2D45] rounded-lg px-3 py-1.5 text-xs text-gray-300 placeholder-gray-600 focus:outline-none focus:border-[#2563EB] w-52"
-              placeholder="Search by TXN or Audit ID..."
-            />
-            <button onClick={handleExportCsv} className="px-3 py-1.5 bg-[#1A2332] border border-[#1E2D45] rounded-lg text-xs text-gray-400 hover:text-white transition-colors">
-              Export CSV
-            </button>
+          <div className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse-dot" />
+            <span className="text-[9px] text-gray-500 font-mono">{sortedLogs.length} events</span>
           </div>
         </div>
 
-        {logs.length === 0 ? (
-          <p className="text-xs text-gray-500 py-8 text-center">No audit records yet. Trigger recovery decisions to generate audit logs.</p>
-        ) : filtered.length === 0 ? (
-          <p className="text-xs text-gray-500 py-8 text-center">No records match your search.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="text-[10px] text-gray-500 uppercase tracking-wider border-b border-[#1E2D45]">
-                  <th className="text-left pb-2.5">Audit ID</th>
-                  <th className="text-left pb-2.5">Timestamp</th>
-                  <th className="text-left pb-2.5">TXN ID</th>
-                  <th className="text-left pb-2.5">Event Type</th>
-                  <th className="text-left pb-2.5">Action</th>
-                  <th className="text-left pb-2.5">Status</th>
-                  <th className="text-left pb-2.5">Details</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((log) => (
-                  <tr key={log.auditId} onClick={() => setSearch(log.transactionId)} className="table-row-hover border-b border-[#1E2D45]/40 cursor-pointer">
-                    <td className="py-3 font-mono text-[11px] text-[#3B82F6]">{log.auditId}</td>
-                    <td className="py-3 font-mono text-[10px] text-gray-500">{log.timestamp ? new Date(log.timestamp).toLocaleString() : ''}</td>
-                    <td className="py-3 font-mono text-[11px] text-gray-400">{log.transactionId}</td>
-                    <td className="py-3 text-[11px] text-gray-200">{log.eventType}</td>
-                    <td className="py-3 text-[11px] text-gray-200">{log.action}</td>
-                    <td className="py-3">
-                      <StatusBadge status={log.status} />
-                    </td>
-                    <td className="py-3 text-[10px] text-gray-400 max-w-[200px] truncate">
-                      {log.eventType === 'AI_DECISION' && (log.details as Record<string, unknown>)?.reason ? String((log.details as Record<string, unknown>).reason) :
-                       log.eventType === 'POLICY_CHECK' && (log.details as Record<string, unknown>)?.passed !== undefined ? ((log.details as Record<string, unknown>).passed ? 'Passed' : 'Blocked') :
-                       log.eventType === 'ACTION_RESULT' && (log.details as Record<string, unknown>)?.executed !== undefined ? ((log.details as Record<string, unknown>).executed ? 'Executed' : 'Failed') :
-                       log.eventType === 'SIMULATION_RESULT' && (log.details as Record<string, unknown>)?.succeeded !== undefined ? ((log.details as Record<string, unknown>).succeeded ? 'Success' : 'Failed') :
-                       '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <div className="max-h-[700px] overflow-y-auto bg-[#0B1120] p-4 font-mono text-[11px]">
+          {sortedLogs.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-gray-500 text-xs">No audit events found.</p>
+              <p className="text-gray-600 text-[10px] mt-1">Trigger recovery decisions to generate audit logs.</p>
+            </div>
+          ) : (
+            <div className="space-y-0.5">
+              {sortedLogs.map((log, idx) => {
+                const config = eventTypeConfig[log.eventType] || { label: log.eventType, color: 'text-gray-400', bg: 'bg-gray-500/10' }
+                const time = log.timestamp ? new Date(log.timestamp).toLocaleTimeString('en-US', { hour12: false }) : '--:--:--'
+                const isPolicyPassed = log.eventType === 'POLICY_CHECK' && log.status === 'PASSED'
+                const isPolicyBlocked = log.eventType === 'POLICY_CHECK' && log.status === 'BLOCKED'
+                const isPolicyApproval = log.eventType === 'POLICY_CHECK' && log.status === 'APPROVAL_REQUIRED'
+
+                return (
+                  <div key={log.auditId} className="flex flex-col py-1.5 group">
+                    <div className="flex items-start gap-0">
+                      <span className="text-gray-600 w-16 flex-shrink-0">{time}</span>
+                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${config.color} ${config.bg} w-28 flex-shrink-0 text-center`}>
+                        {config.label}
+                      </span>
+                      <span className="text-gray-500 w-44 flex-shrink-0 truncate">{log.transactionId}</span>
+                      {isPolicyPassed && <span className="text-emerald-400 text-[9px] font-bold ml-1">PASSED</span>}
+                      {isPolicyBlocked && <span className="text-red-400 text-[9px] font-bold ml-1">BLOCKED</span>}
+                      {isPolicyApproval && <span className="text-amber-400 text-[9px] font-bold ml-1">APPROVAL_REQUIRED</span>}
+                    </div>
+                    <div className="ml-16 mt-0.5 space-y-0.5">
+                      {renderEventDetails(log)}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
       </Card>
     </div>
   );
@@ -1645,6 +2219,11 @@ function AnalyticsView({ dateRange }: { dateRange: string }) {
   const evaluation = evalData?.data;
   const { data: mlData, loading: mlLoading } = useApiData(fetchMLMetrics);
   const mlMetrics = mlData?.data;
+  const { data: actualData, loading: actualLoading } = useApiData(fetchActualRecoveryPerformance);
+  const actual = actualData?.data;
+
+  const [showHistorical, setShowHistorical] = useState(false);
+  const [showActual, setShowActual] = useState(false);
 
   const dayOrder = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -1698,220 +2277,416 @@ function AnalyticsView({ dateRange }: { dateRange: string }) {
   if (error) return <ErrorMessage message={error} onRetry={retry} />;
 
   return (
-    <div className="space-y-4 animate-fade-in">
-      <div className="grid grid-cols-4 gap-4">
-        <StatCard label="Money At Risk" value={fmt(analytics?.totalAtRisk || 0)} sub="This week" delta="+4.2%" />
-        <StatCard label="Money Recovered" value={fmt(analytics?.totalRecovered || 0)} sub="This week" delta="+7.8%" accent />
-        <StatCard label="Recovery Rate" value={`${analytics?.recoveryRate || 0}%`} sub="Industry avg: 45%" delta="+3.3%" />
-        <StatCard label="Unnecessary Actions" value={analytics?.unnecessaryActions ? `${analytics.unnecessaryActions}` : '0'} sub="False positive actions" />
+    <div className="space-y-6 animate-fade-in">
+      {/* ============================================================ */}
+      {/* COLLAPSIBLE: HISTORICAL MODEL EVALUATION                      */}
+      {/* ============================================================ */}
+      <div
+        onClick={() => setShowHistorical(!showHistorical)}
+        className="flex items-center justify-between px-5 py-3 bg-[#090E1A] border border-[#1E2D45] rounded-xl cursor-pointer hover:border-[#2563EB]/30 transition-colors"
+      >
+        <div>
+          <p className="text-[10px] text-gray-500 uppercase tracking-wider font-mono font-semibold">HISTORICAL MODEL EVALUATION</p>
+          <p className="text-[10px] text-gray-600 mt-0.5">ML model precision, recall, F1, confusion matrix on 5,000 historical transactions</p>
+        </div>
+        <span className={`text-[10px] text-gray-500 transition-transform ${showHistorical ? 'rotate-90' : ''}`}>&#9654;</span>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <Card className="p-5">
-          <p className="text-sm font-semibold font-display text-white mb-1">Weekly At-Risk vs Recovered</p>
-          <p className="text-xs text-gray-500 mb-4">Daily comparison this week</p>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={weeklyData} barCategoryGap="30%">
-              <XAxis dataKey="day" tick={{ fill: "#4B5563", fontSize: 10 }} axisLine={false} tickLine={false} />
-              <YAxis tickFormatter={(v) => fmt(v)} tick={{ fill: "#4B5563", fontSize: 10 }} axisLine={false} tickLine={false} />
-              <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="atRisk" name="At Risk" fill="#EF444440" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="recovered" name="Recovered" fill="#2563EB" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
-
-        <Card className="p-5">
-          <p className="text-sm font-semibold font-display text-white mb-1">Intervention Performance</p>
-          <p className="text-xs text-gray-500 mb-4">Success rate by recovery type</p>
-          <div className="space-y-3">
-            {interventionsData.map((item) => (
-              <div key={item.type}>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs text-gray-300">{item.type}</span>
-                  <span className="font-mono text-[11px] text-gray-400">{item.success}/{item.count} · <span className="text-white">{item.rate}%</span></span>
-                </div>
-                <div className="w-full h-1.5 bg-[#1E2D45] rounded-full">
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{ width: `${item.rate}%`, background: item.rate >= 70 ? "#2563EB" : item.rate >= 60 ? "#7C3AED" : "#4B5563" }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      </div>
-
-      <Card className="p-5">
-        <p className="text-sm font-semibold font-display text-white mb-1">Successful Interventions</p>
-        <p className="text-xs text-gray-500 mb-4">{analytics?.successfulInterventions || 0} total interventions this week</p>
-        <ResponsiveContainer width="100%" height={180}>
-          <LineChart data={recoveryTrendData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#1E2D45" />
-            <XAxis dataKey="date" tick={{ fill: "#4B5563", fontSize: 10 }} axisLine={false} tickLine={false} />
-            <YAxis tickFormatter={(v) => `${v}%`} tick={{ fill: "#4B5563", fontSize: 10 }} axisLine={false} tickLine={false} domain={[55, 70]} />
-            <Tooltip formatter={(v: any) => [`${v}%`, "Recovery Rate"]} contentStyle={{ background: "#1A2332", border: "1px solid #1E2D45", borderRadius: 8, fontSize: 11 }} />
-            <Line type="monotone" dataKey="rate" stroke="#2563EB" strokeWidth={2} dot={{ fill: "#2563EB", r: 3 }} />
-          </LineChart>
-        </ResponsiveContainer>
-      </Card>
-
-      {evalLoading ? (
-        <Card className="p-5"><LoadingSpinner /></Card>
-      ) : evaluation ? (
-        <>
-          <div className="border-t border-[#1E2D45] pt-4">
-            <p className="text-[10px] text-gray-500 uppercase tracking-wider font-mono font-semibold">Model Evaluation — Historical 5,000 Transactions</p>
-          </div>
-
-          <Card className="p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-7 h-7 rounded-lg bg-[#2563EB]/20 flex items-center justify-center">
-                <span className="text-sm">&#128202;</span>
-              </div>
+      {showHistorical && (
+        <div className="border border-[#1E2D45] rounded-xl overflow-hidden">
+          <div className="bg-[#090E1A] border-b border-[#1E2D45] px-5 py-3">
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-semibold font-display text-white">AI Evaluation</p>
-                <p className="text-[10px] text-gray-500 font-mono">{evaluation.totalDecisions} decisions evaluated across {evaluation.totalTransactions} transactions</p>
+                <p className="text-[10px] text-gray-500 uppercase tracking-wider font-mono font-semibold">HISTORICAL MODEL EVALUATION</p>
+                <p className="text-[10px] text-gray-600 mt-0.5">Evaluated on historical transaction data. These metrics measure prediction quality, not live merchant recovery.</p>
               </div>
+              <span className="text-[9px] text-gray-600 font-mono px-2 py-0.5 bg-[#111827] rounded border border-[#1E2D45]">Source: Historical evaluation dataset</span>
             </div>
-          </Card>
-
-          <p className="text-[10px] text-gray-500 uppercase tracking-wider font-mono font-semibold">Business Outcome</p>
-          <div className="grid grid-cols-4 gap-4">
-            <StatCard label="Total At Risk" value={fmt(evaluation.totalAtRisk)} sub="Recoverable transactions" />
-            <StatCard label="Total Recovered" value={fmt(evaluation.totalRecovered)} sub="Ground truth recovered" accent />
-            <StatCard label="Recovery Rate" value={`${evaluation.recoveryRate}%`} sub="Recovered / At Risk" />
-            <StatCard label="Transactions" value={String(evaluation.totalTransactions)} sub="Total evaluated" />
           </div>
 
-          <p className="text-[10px] text-gray-500 uppercase tracking-wider font-mono font-semibold">AI Decision Quality</p>
-          <div className="grid grid-cols-4 gap-4">
-            <StatCard label="Precision" value={`${evaluation.precision}%`} sub="TP / (TP + FP)" />
-            <StatCard label="Recall" value={`${evaluation.recall}%`} sub="TP / (TP + FN)" accent />
-            <StatCard label="F1 Score" value={`${evaluation.f1Score}%`} sub="Harmonic mean" />
-            <StatCard label="False Positive Rate" value={`${evaluation.falsePositiveRate}%`} sub="FP / (FP + TN)" />
-          </div>
+          <div className="p-5 space-y-5">
+            {evalLoading ? (
+              <Card className="p-5"><LoadingSpinner /></Card>
+            ) : evaluation ? (
+              <>
+                <div className="flex items-center gap-3">
+                  <div className="w-7 h-7 rounded-lg bg-[#2563EB]/20 flex items-center justify-center flex-shrink-0">
+                    <span className="text-sm">&#128202;</span>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold font-display text-white">{evaluation.totalTransactions} Historical Transactions Evaluated</p>
+                    <p className="text-[10px] text-gray-500 font-mono">{evaluation.totalDecisions} AI decisions compared against ground truth</p>
+                  </div>
+                </div>
 
-          <div className="grid grid-cols-4 gap-4">
-            <StatCard label="True Positives" value={String(evaluation.truePositives)} sub="Action + Recoverable" />
-            <StatCard label="True Negatives" value={String(evaluation.trueNegatives)} sub="No Action + Not Recoverable" />
-            <StatCard label="False Positives" value={String(evaluation.falsePositives)} sub="Action but Not Recoverable" />
-            <StatCard label="False Negatives" value={String(evaluation.falseNegatives)} sub="No Action but Recoverable" />
-          </div>
+                <p className="text-[10px] text-gray-500 uppercase tracking-wider font-mono font-semibold">AI Decision Quality</p>
+                <div className="grid grid-cols-4 gap-4">
+                  <div className="p-3 bg-[#111827] rounded-lg border border-[#1E2D45]">
+                    <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-1">Precision</p>
+                    <p className="text-lg font-bold font-mono text-white">{evaluation.precision}%</p>
+                    <p className="text-[9px] text-gray-500 mt-1">Of transactions predicted as recoverable, how many were actually recoverable?</p>
+                  </div>
+                  <div className="p-3 bg-[#111827] rounded-lg border border-[#1E2D45]">
+                    <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-1">Recall</p>
+                    <p className="text-lg font-bold font-mono text-[#3B82F6]">{evaluation.recall}%</p>
+                    <p className="text-[9px] text-gray-500 mt-1">Of recoverable transactions, how many did the model identify?</p>
+                  </div>
+                  <div className="p-3 bg-[#111827] rounded-lg border border-[#1E2D45]">
+                    <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-1">F1 Score</p>
+                    <p className="text-lg font-bold font-mono text-white">{evaluation.f1Score}%</p>
+                    <p className="text-[9px] text-gray-500 mt-1">Balance between precision and recall.</p>
+                  </div>
+                  <div className="p-3 bg-[#111827] rounded-lg border border-[#1E2D45]">
+                    <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-1">Action Accuracy</p>
+                    <p className="text-lg font-bold font-mono text-white">{evaluation.actionAccuracy}%</p>
+                    <p className="text-[9px] text-gray-500 mt-1">How often did the AI choose the same recovery action as the historical ground truth?</p>
+                  </div>
+                </div>
 
-          <div className="grid grid-cols-3 gap-4">
-            <StatCard label="Correct Decisions" value={String(evaluation.correctDecisions)} sub="TP + TN" accent />
-            <StatCard label="Action Accuracy" value={`${evaluation.actionAccuracy}%`} sub="AI action vs ground truth" />
-            <StatCard label="Total Decisions" value={String(evaluation.totalDecisions)} sub="With comparable AI decisions" />
-          </div>
+                <p className="text-[10px] text-gray-500 uppercase tracking-wider font-mono font-semibold">Confusion Matrix</p>
+                <div className="grid grid-cols-4 gap-4">
+                  <div className="p-3 bg-emerald-500/5 rounded-lg border border-emerald-500/20">
+                    <p className="text-[9px] text-emerald-400 uppercase tracking-wider mb-1">True Positives</p>
+                    <p className="text-lg font-bold font-mono text-emerald-400">{evaluation.truePositives}</p>
+                    <p className="text-[9px] text-gray-500 mt-1">Action predicted + actually recoverable</p>
+                  </div>
+                  <div className="p-3 bg-[#2563EB]/5 rounded-lg border border-[#2563EB]/20">
+                    <p className="text-[9px] text-[#60A5FA] uppercase tracking-wider mb-1">True Negatives</p>
+                    <p className="text-lg font-bold font-mono text-[#60A5FA]">{evaluation.trueNegatives}</p>
+                    <p className="text-[9px] text-gray-500 mt-1">No action predicted + not recoverable</p>
+                  </div>
+                  <div className="p-3 bg-amber-500/5 rounded-lg border border-amber-500/20">
+                    <p className="text-[9px] text-amber-400 uppercase tracking-wider mb-1">False Positives</p>
+                    <p className="text-lg font-bold font-mono text-amber-400">{evaluation.falsePositives}</p>
+                    <p className="text-[9px] text-gray-500 mt-1">Action predicted but not actually recoverable</p>
+                  </div>
+                  <div className="p-3 bg-red-500/5 rounded-lg border border-red-500/20">
+                    <p className="text-[9px] text-red-400 uppercase tracking-wider mb-1">False Negatives</p>
+                    <p className="text-lg font-bold font-mono text-red-400">{evaluation.falseNegatives}</p>
+                    <p className="text-[9px] text-gray-500 mt-1">No action predicted but was recoverable</p>
+                  </div>
+                </div>
 
-          <p className="text-[10px] text-gray-500 uppercase tracking-wider font-mono font-semibold">Operational Execution</p>
-          <div className="grid grid-cols-3 gap-4">
-            <StatCard label="Blocked by Guardrails" value={String(evaluation.blockedByGuardrails)} sub="Policy prevented execution" />
-            <StatCard label="Requires Approval" value={String(evaluation.requiresApprovalCount)} sub="High-value / policy flag" />
-            <StatCard label="Action Breakdown" value={String(evaluation.actionMetrics.length)} sub="Unique AI actions used" />
-          </div>
+                <p className="text-[10px] text-gray-500 uppercase tracking-wider font-mono font-semibold">Historical Business Outcome</p>
+                <div className="grid grid-cols-4 gap-4">
+                  <StatCard label="Total At Risk" value={fmt(evaluation.totalAtRisk)} sub="Recoverable transactions in dataset" />
+                  <StatCard label="Total Recovered (Ground Truth)" value={fmt(evaluation.totalRecovered)} sub="Confirmed recovered in historical data" accent />
+                  <StatCard label="Historical Recovery Rate" value={`${evaluation.recoveryRate}%`} sub="Recovered / At Risk (historical)" />
+                  <StatCard label="False Positive Rate" value={`${evaluation.falsePositiveRate}%`} sub="FP / (FP + TN)" />
+                </div>
 
-          <Card className="p-5">
-            <p className="text-sm font-semibold font-display text-white mb-4">Action-Level Evaluation</p>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="text-[10px] text-gray-500 uppercase tracking-wider border-b border-[#1E2D45]">
-                    <th className="text-left pb-2.5">Action</th>
-                    <th className="text-right pb-2.5">Count</th>
-                    <th className="text-right pb-2.5">Correct</th>
-                    <th className="text-right pb-2.5">Incorrect</th>
-                    <th className="text-right pb-2.5">TP</th>
-                    <th className="text-right pb-2.5">TN</th>
-                    <th className="text-right pb-2.5">FP</th>
-                    <th className="text-right pb-2.5">FN</th>
-                    <th className="text-right pb-2.5">Recovered</th>
-                    <th className="text-right pb-2.5">Blocked</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {evaluation.actionMetrics.map((am) => (
-                    <tr key={am.action} className="table-row-hover border-b border-[#1E2D45]/40">
-                      <td className="py-3 text-xs text-gray-200 font-medium">{am.action}</td>
-                      <td className="py-3 text-right font-mono text-[11px] text-gray-400">{am.count}</td>
-                      <td className="py-3 text-right font-mono text-[11px] text-emerald-400">{am.correct}</td>
-                      <td className="py-3 text-right font-mono text-[11px] text-red-400">{am.incorrect}</td>
-                      <td className="py-3 text-right font-mono text-[11px] text-gray-400">{am.truePositives}</td>
-                      <td className="py-3 text-right font-mono text-[11px] text-gray-400">{am.trueNegatives}</td>
-                      <td className="py-3 text-right font-mono text-[11px] text-amber-400">{am.falsePositives}</td>
-                      <td className="py-3 text-right font-mono text-[11px] text-amber-400">{am.falseNegatives}</td>
-                      <td className="py-3 text-right font-mono text-[11px] text-emerald-400">{fmt(am.recoveredAmount)}</td>
-                      <td className="py-3 text-right font-mono text-[11px] text-gray-400">{am.blockedByGuardrails}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                <Card className="p-5">
+                  <p className="text-sm font-semibold font-display text-white mb-4">Action-Level Historical Evaluation</p>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="text-[10px] text-gray-500 uppercase tracking-wider border-b border-[#1E2D45]">
+                          <th className="text-left pb-2.5">Action</th>
+                          <th className="text-right pb-2.5">Count</th>
+                          <th className="text-right pb-2.5">Correct</th>
+                          <th className="text-right pb-2.5">Incorrect</th>
+                          <th className="text-right pb-2.5">TP</th>
+                          <th className="text-right pb-2.5">TN</th>
+                          <th className="text-right pb-2.5">FP</th>
+                          <th className="text-right pb-2.5">FN</th>
+                          <th className="text-right pb-2.5">Recovered</th>
+                          <th className="text-right pb-2.5">Blocked</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {evaluation.actionMetrics.map((am) => (
+                          <tr key={am.action} className="table-row-hover border-b border-[#1E2D45]/40">
+                            <td className="py-3 text-xs text-gray-200 font-medium">{am.action}</td>
+                            <td className="py-3 text-right font-mono text-[11px] text-gray-400">{am.count}</td>
+                            <td className="py-3 text-right font-mono text-[11px] text-emerald-400">{am.correct}</td>
+                            <td className="py-3 text-right font-mono text-[11px] text-red-400">{am.incorrect}</td>
+                            <td className="py-3 text-right font-mono text-[11px] text-gray-400">{am.truePositives}</td>
+                            <td className="py-3 text-right font-mono text-[11px] text-gray-400">{am.trueNegatives}</td>
+                            <td className="py-3 text-right font-mono text-[11px] text-amber-400">{am.falsePositives}</td>
+                            <td className="py-3 text-right font-mono text-[11px] text-amber-400">{am.falseNegatives}</td>
+                            <td className="py-3 text-right font-mono text-[11px] text-emerald-400">{fmt(am.recoveredAmount)}</td>
+                            <td className="py-3 text-right font-mono text-[11px] text-gray-400">{am.blockedByGuardrails}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              </>
+            ) : (
+              <Card className="p-8 text-center">
+                <p className="text-sm text-gray-400">No historical evaluation data available</p>
+              </Card>
+            )}
+
+            {mlMetrics?.loaded && (
+              <>
+                <p className="text-[10px] text-gray-500 uppercase tracking-wider font-mono font-semibold">ML Model Performance (Trained on Historical Data)</p>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="p-3 bg-[#111827] rounded-lg border border-[#1E2D45]">
+                    <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-1">Recoverability Classifier</p>
+                    <p className="text-lg font-bold font-mono text-white">{mlMetrics.recoverability?.accuracy ? (mlMetrics.recoverability.accuracy * 100).toFixed(1) : 0}%</p>
+                    <p className="text-[9px] text-gray-500 mt-1">Accuracy · F1: {mlMetrics.recoverability?.f1Score ? (mlMetrics.recoverability.f1Score * 100).toFixed(1) : 0}%</p>
+                  </div>
+                  <div className="p-3 bg-[#111827] rounded-lg border border-[#1E2D45]">
+                    <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-1">Risk Score Model</p>
+                    <p className="text-lg font-bold font-mono text-white">MAE: {mlMetrics.riskScore?.mae?.toFixed(2) || '0'}</p>
+                    <p className="text-[9px] text-gray-500 mt-1">R²: {mlMetrics.riskScore?.r2Score?.toFixed(3) || '0'}</p>
+                  </div>
+                  <div className="p-3 bg-[#111827] rounded-lg border border-[#1E2D45]">
+                    <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-1">Action Classifier</p>
+                    <p className="text-lg font-bold font-mono text-white">{mlMetrics.action?.accuracy ? (mlMetrics.action.accuracy * 100).toFixed(1) : 0}%</p>
+                    <p className="text-[9px] text-gray-500 mt-1">Macro F1: {mlMetrics.action?.macroF1 ? (mlMetrics.action.macroF1 * 100).toFixed(1) : 0}%</p>
+                  </div>
+                </div>
+
+                <Card className="p-5">
+                  <p className="text-sm font-semibold font-display text-white mb-4">ML Action Classification (Per-Class)</p>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="text-[10px] text-gray-500 uppercase tracking-wider border-b border-[#1E2D45]">
+                          <th className="text-left pb-2.5">Action</th>
+                          <th className="text-right pb-2.5">Precision</th>
+                          <th className="text-right pb-2.5">Recall</th>
+                          <th className="text-right pb-2.5">F1 Score</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {mlMetrics.action?.perClass && Object.entries(mlMetrics.action.perClass).map(([action, metrics]) => (
+                          <tr key={action} className="table-row-hover border-b border-[#1E2D45]/40">
+                            <td className="py-3 text-xs text-gray-200 font-medium">{action}</td>
+                            <td className="py-3 text-right font-mono text-[11px] text-gray-400">{(metrics.precision * 100).toFixed(1)}%</td>
+                            <td className="py-3 text-right font-mono text-[11px] text-gray-400">{(metrics.recall * 100).toFixed(1)}%</td>
+                            <td className="py-3 text-right font-mono text-[11px] text-gray-400">{(metrics.f1Score * 100).toFixed(1)}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+
+                <Card className="p-5">
+                  <p className="text-sm font-semibold font-display text-white mb-4">Feature Importance (Recoverability Model)</p>
+                  <div className="space-y-2">
+                    {mlMetrics.recoverability?.featureImportances && Object.entries(mlMetrics.recoverability.featureImportances)
+                      .sort(([, a], [, b]) => b - a)
+                      .slice(0, 8)
+                      .map(([feature, importance]) => (
+                        <div key={feature}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs text-gray-300">{feature}</span>
+                            <span className="font-mono text-[11px] text-gray-400">{(importance * 100).toFixed(1)}%</span>
+                          </div>
+                          <div className="w-full h-1.5 bg-[#1E2D45] rounded-full">
+                            <div
+                              className="h-full rounded-full bg-[#2563EB]"
+                              style={{ width: `${importance * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </Card>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* COLLAPSIBLE: ACTUAL RECOVERY PERFORMANCE                      */}
+      {/* ============================================================ */}
+      <div
+        onClick={() => setShowActual(!showActual)}
+        className="flex items-center justify-between px-5 py-3 bg-[#090E1A] border border-emerald-500/20 rounded-xl cursor-pointer hover:border-emerald-500/30 transition-colors"
+      >
+        <div>
+          <p className="text-[10px] text-emerald-400 uppercase tracking-wider font-mono font-semibold">ACTUAL RECOVERY PERFORMANCE</p>
+          <p className="text-[10px] text-gray-600 mt-0.5">Live agent execution results — successful orders, failures, guardrail blocks, pending recoveries</p>
+        </div>
+        <span className={`text-[10px] text-gray-500 transition-transform ${showActual ? 'rotate-90' : ''}`}>&#9654;</span>
+      </div>
+
+      {showActual && (
+        <div className="border border-emerald-500/20 rounded-xl overflow-hidden">
+          <div className="bg-[#090E1A] border-b border-emerald-500/20 px-5 py-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] text-emerald-400 uppercase tracking-wider font-mono font-semibold">ACTUAL RECOVERY PERFORMANCE</p>
+                <p className="text-[10px] text-gray-600 mt-0.5">Measured from recovery actions executed by the agent. This is operational performance, not model accuracy.</p>
+              </div>
+              <span className="text-[9px] text-gray-600 font-mono px-2 py-0.5 bg-[#111827] rounded border border-[#1E2D45]">
+                Source: {actual?.sources?.join(' + ') || 'Agent executions + audit/recovery results'}
+              </span>
             </div>
-          </Card>
-        </>
-      ) : null}
-
-      {mlMetrics?.loaded && (
-        <>
-          <p className="text-[10px] text-gray-500 uppercase tracking-wider font-mono font-semibold">ML Model Performance</p>
-          <div className="grid grid-cols-3 gap-4">
-            <StatCard label="Recoverability Accuracy" value={`${mlMetrics.recoverability?.accuracy ? (mlMetrics.recoverability.accuracy * 100).toFixed(1) : 0}%`} sub={`F1: ${mlMetrics.recoverability?.f1Score ? (mlMetrics.recoverability.f1Score * 100).toFixed(1) : 0}%`} />
-            <StatCard label="Risk Score MAE" value={mlMetrics.riskScore?.mae?.toFixed(2) || '0'} sub={`R²: ${mlMetrics.riskScore?.r2Score?.toFixed(3) || '0'}`} accent />
-            <StatCard label="Action Accuracy" value={`${mlMetrics.action?.accuracy ? (mlMetrics.action.accuracy * 100).toFixed(1) : 0}%`} sub={`Macro F1: ${mlMetrics.action?.macroF1 ? (mlMetrics.action.macroF1 * 100).toFixed(1) : 0}%`} />
           </div>
 
-          <Card className="p-5">
-            <p className="text-sm font-semibold font-display text-white mb-4">ML Action Classification (Per-Class)</p>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="text-[10px] text-gray-500 uppercase tracking-wider border-b border-[#1E2D45]">
-                    <th className="text-left pb-2.5">Action</th>
-                    <th className="text-right pb-2.5">Precision</th>
-                    <th className="text-right pb-2.5">Recall</th>
-                    <th className="text-right pb-2.5">F1 Score</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {mlMetrics.action?.perClass && Object.entries(mlMetrics.action.perClass).map(([action, metrics]) => (
-                    <tr key={action} className="table-row-hover border-b border-[#1E2D45]/40">
-                      <td className="py-3 text-xs text-gray-200 font-medium">{action}</td>
-                      <td className="py-3 text-right font-mono text-[11px] text-gray-400">{(metrics.precision * 100).toFixed(1)}%</td>
-                      <td className="py-3 text-right font-mono text-[11px] text-gray-400">{(metrics.recall * 100).toFixed(1)}%</td>
-                      <td className="py-3 text-right font-mono text-[11px] text-gray-400">{(metrics.f1Score * 100).toFixed(1)}%</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
+          <div className="p-5 space-y-5">
+            {actualLoading ? (
+              <Card className="p-5"><LoadingSpinner /></Card>
+            ) : actual ? (
+              <>
+                <div className="grid grid-cols-4 gap-4">
+                  <div className="p-3 bg-[#111827] rounded-lg border border-[#1E2D45]">
+                    <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-1">Confirmed Recovered</p>
+                    <p className="text-lg font-bold font-mono text-white">
+                      {actual.recovery.confirmedRecoveredAmount > 0 ? fmt(actual.recovery.confirmedRecoveredAmount) : '—'}
+                    </p>
+                    <p className="text-[9px] text-gray-500 mt-1">Only confirmed recovery payments</p>
+                  </div>
+                  <div className="p-3 bg-[#111827] rounded-lg border border-[#1E2D45]">
+                    <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-1">Recovery Rate</p>
+                    <p className="text-lg font-bold font-mono text-white">
+                      {actual.recovery.recoveryRate !== null ? `${actual.recovery.recoveryRate}%` : 'Insufficient data'}
+                    </p>
+                    <p className="text-[9px] text-gray-500 mt-1">Confirmed recovered / Executed amount</p>
+                  </div>
+                  <div className="p-3 bg-[#111827] rounded-lg border border-[#1E2D45]">
+                    <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-1">Total Executed Amount</p>
+                    <p className="text-lg font-bold font-mono text-white">{fmt(actual.recovery.totalExecutedAmount)}</p>
+                    <p className="text-[9px] text-gray-500 mt-1">Amount sent to successful execution</p>
+                  </div>
+                  <div className="p-3 bg-[#111827] rounded-lg border border-[#1E2D45]">
+                    <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-1">Pending Recoveries</p>
+                    <p className="text-lg font-bold font-mono text-amber-400">{actual.recovery.pendingRecoveries}</p>
+                    <p className="text-[9px] text-gray-500 mt-1">Awaiting customer payment response</p>
+                  </div>
+                </div>
 
-          <Card className="p-5">
-            <p className="text-sm font-semibold font-display text-white mb-4">Feature Importance (Recoverability Model)</p>
-            <div className="space-y-2">
-              {mlMetrics.recoverability?.featureImportances && Object.entries(mlMetrics.recoverability.featureImportances)
-                .sort(([, a], [, b]) => b - a)
-                .slice(0, 8)
-                .map(([feature, importance]) => (
-                  <div key={feature}>
+                <p className="text-[10px] text-gray-500 uppercase tracking-wider font-mono font-semibold">Execution Status Breakdown</p>
+                <div className="grid grid-cols-4 gap-4">
+                  <div className="p-3 bg-emerald-500/5 rounded-lg border border-emerald-500/20">
+                    <p className="text-[9px] text-emerald-400 uppercase tracking-wider mb-1">Successful Executions</p>
+                    <p className="text-lg font-bold font-mono text-emerald-400">{actual.executions.successful}</p>
+                    <p className="text-[9px] text-gray-500 mt-1">Orders/payment links created</p>
+                  </div>
+                  <div className="p-3 bg-red-500/5 rounded-lg border border-red-500/20">
+                    <p className="text-[9px] text-red-400 uppercase tracking-wider mb-1">Failed Executions</p>
+                    <p className="text-lg font-bold font-mono text-red-400">{actual.executions.failed}</p>
+                    <p className="text-[9px] text-gray-500 mt-1">Execution attempted but failed</p>
+                  </div>
+                  <div className="p-3 bg-gray-500/5 rounded-lg border border-gray-500/20">
+                    <p className="text-[9px] text-gray-400 uppercase tracking-wider mb-1">Not Supported</p>
+                    <p className="text-lg font-bold font-mono text-gray-400">{actual.executions.notSupported}</p>
+                    <p className="text-[9px] text-gray-500 mt-1">Action type without execution flow</p>
+                  </div>
+                  <div className="p-3 bg-[#111827] rounded-lg border border-[#1E2D45]">
+                    <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-1">Total Agent Runs</p>
+                    <p className="text-lg font-bold font-mono text-white">{actual.summary.totalAgentRuns}</p>
+                    <p className="text-[9px] text-gray-500 mt-1">All autonomous pipeline runs</p>
+                  </div>
+                </div>
+
+                <p className="text-[10px] text-gray-500 uppercase tracking-wider font-mono font-semibold">Policy Outcomes (Separate from Execution)</p>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="p-3 bg-[#111827] rounded-lg border border-[#1E2D45]">
+                    <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-1">Guardrail Blocked</p>
+                    <p className="text-lg font-bold font-mono text-amber-400">{actual.policy.guardrailBlocked}</p>
+                    <p className="text-[9px] text-gray-500 mt-1">Recovery actions prevented by policy before execution</p>
+                  </div>
+                  <div className="p-3 bg-[#111827] rounded-lg border border-[#1E2D45]">
+                    <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-1">Awaiting Approval</p>
+                    <p className="text-lg font-bold font-mono text-amber-400">{actual.policy.approvalRequired}</p>
+                    <p className="text-[9px] text-gray-500 mt-1">Requires human review before execution</p>
+                  </div>
+                  <div className="p-3 bg-[#111827] rounded-lg border border-[#1E2D45]">
+                    <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-1">Policy Passed</p>
+                    <p className="text-lg font-bold font-mono text-emerald-400">{actual.policy.policyPassed}</p>
+                    <p className="text-[9px] text-gray-500 mt-1">Execution allowed by policy</p>
+                  </div>
+                </div>
+
+                <Card className="p-5">
+                  <p className="text-sm font-semibold font-display text-white mb-2">Important Notes</p>
+                  <div className="space-y-2 text-[11px] text-gray-400">
+                    <p>• <span className="text-white font-medium">ORDER_CREATED</span> means a Razorpay order was created, not that payment was received. Recovery status is <span className="text-amber-400 font-medium">PENDING</span> until confirmed.</p>
+                    <p>• <span className="text-white font-medium">Guardrail blocks</span> are separate from execution failures. A blocked action was never attempted.</p>
+                    <p>• <span className="text-white font-medium">NOT_SUPPORTED</span> actions have no execution flow yet and should not be counted as failures.</p>
+                    {actual.recovery.simulatedRecoveredAmount > 0 && (
+                      <p>• <span className="text-white font-medium">Simulated recovery</span> amount: {fmt(actual.recovery.simulatedRecoveredAmount)} (simulation only, not actual recovery).</p>
+                    )}
+                  </div>
+                </Card>
+              </>
+            ) : (
+              <Card className="p-8 text-center">
+                <p className="text-sm text-gray-400">No actual recovery data available</p>
+                <p className="text-[10px] text-gray-600 mt-1">Execute recovery actions to generate operational performance data</p>
+              </Card>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* NORMAL ANALYTICS (DEFAULT VISIBLE)                             */}
+      {/* ============================================================ */}
+      <div className="border border-[#1E2D45] rounded-xl overflow-hidden">
+        <div className="bg-[#090E1A] border-b border-[#1E2D45] px-5 py-3">
+          <p className="text-[10px] text-gray-500 uppercase tracking-wider font-mono font-semibold">RECOVERY TRENDS</p>
+          <p className="text-[10px] text-gray-600 mt-0.5">Historical recovery patterns from the evaluation dataset</p>
+        </div>
+        <div className="p-5 space-y-4">
+          <div className="grid grid-cols-4 gap-4">
+            <StatCard label="Money At Risk" value={fmt(analytics?.totalAtRisk || 0)} sub="Recoverable amount in dataset" />
+            <StatCard label="Money Recovered" value={fmt(analytics?.totalRecovered || 0)} sub="Confirmed recovered (ground truth)" accent />
+            <StatCard label="Recovery Rate" value={`${analytics?.recoveryRate || 0}%`} sub="Recovered / At Risk" />
+            <StatCard label="Successful Interventions" value={String(analytics?.successfulInterventions || 0)} sub="Correct AI decisions" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Card className="p-5">
+              <p className="text-sm font-semibold font-display text-white mb-1">Weekly At-Risk vs Recovered</p>
+              <p className="text-xs text-gray-500 mb-4">Daily comparison this week (historical)</p>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={weeklyData} barCategoryGap="30%">
+                  <XAxis dataKey="day" tick={{ fill: "#4B5563", fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <YAxis tickFormatter={(v) => fmt(v)} tick={{ fill: "#4B5563", fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar dataKey="atRisk" name="At Risk" fill="#EF444440" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="recovered" name="Recovered" fill="#2563EB" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </Card>
+
+            <Card className="p-5">
+              <p className="text-sm font-semibold font-display text-white mb-1">Intervention Performance</p>
+              <p className="text-xs text-gray-500 mb-4">Success rate by recovery type (historical)</p>
+              <div className="space-y-3">
+                {interventionsData.map((item) => (
+                  <div key={item.type}>
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs text-gray-300">{feature}</span>
-                      <span className="font-mono text-[11px] text-gray-400">{(importance * 100).toFixed(1)}%</span>
+                      <span className="text-xs text-gray-300">{item.type}</span>
+                      <span className="font-mono text-[11px] text-gray-400">{item.success}/{item.count} · <span className="text-white">{item.rate}%</span></span>
                     </div>
                     <div className="w-full h-1.5 bg-[#1E2D45] rounded-full">
                       <div
-                        className="h-full rounded-full bg-[#2563EB]"
-                        style={{ width: `${importance * 100}%` }}
+                        className="h-full rounded-full transition-all"
+                        style={{ width: `${item.rate}%`, background: item.rate >= 70 ? "#2563EB" : item.rate >= 60 ? "#7C3AED" : "#4B5563" }}
                       />
                     </div>
                   </div>
                 ))}
-            </div>
+              </div>
+            </Card>
+          </div>
+
+          <Card className="p-5">
+            <p className="text-sm font-semibold font-display text-white mb-1">Recovery Trend</p>
+            <p className="text-xs text-gray-500 mb-4">Recovery rate over time (historical)</p>
+            <ResponsiveContainer width="100%" height={180}>
+              <LineChart data={recoveryTrendData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1E2D45" />
+                <XAxis dataKey="date" tick={{ fill: "#4B5563", fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tickFormatter={(v) => `${v}%`} tick={{ fill: "#4B5563", fontSize: 10 }} axisLine={false} tickLine={false} domain={[55, 70]} />
+                <Tooltip formatter={(v: any) => [`${v}%`, "Recovery Rate"]} contentStyle={{ background: "#1A2332", border: "1px solid #1E2D45", borderRadius: 8, fontSize: 11 }} />
+                <Line type="monotone" dataKey="rate" stroke="#2563EB" strokeWidth={2} dot={{ fill: "#2563EB", r: 3 }} />
+              </LineChart>
+            </ResponsiveContainer>
           </Card>
-        </>
-      )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -2699,7 +3474,7 @@ export default function App() {
       case "diagnosis": return <DiagnosisView searchQuery={searchQuery} />;
       case "actions": return <ActionsView />;
       case "agent": return <AgentView />;
-      case "guardrails": return <GuardrailsView />;
+      case "guardrails": return <GuardrailsView onNavigate={setView} />;
       case "audit": return <AuditView />;
       case "analytics": return <AnalyticsView dateRange={dateRange} />;
       case "merchants": return <MerchantsView />;
