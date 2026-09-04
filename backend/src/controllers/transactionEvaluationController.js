@@ -1,6 +1,7 @@
 import { ingestAndEvaluate } from '../services/ingestionService.js'
 import { diagnoseTransaction } from '../services/diagnosisService.js'
 import { getRecoveryDecision } from '../services/recoveryService.js'
+import { runAutonomousRecovery } from '../services/autonomousRecoveryService.js'
 
 export const evaluateTransaction = (req, res) => {
   try {
@@ -46,6 +47,13 @@ export const evaluateTransaction = (req, res) => {
 
     const diagnosis = diagnoseTransaction(transaction.id)
     const decision = getRecoveryDecision(transaction.id)
+
+    runAutonomousRecovery(transaction.id, {
+      source: transaction.source || 'demo',
+      skipExisting: true,
+    }).catch(err => {
+      console.error(`[Agent] Auto-recovery failed for ${transaction.id}:`, err.message)
+    })
 
     return res.status(201).json({
       success: true,

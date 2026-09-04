@@ -1,0 +1,32 @@
+{
+  "numericalFeatures": [
+    "amount",
+    "attemptCount",
+    "prevSuccessfulPayments",
+    "prevFailedPayments",
+    "prevRecoveries",
+    "checkoutDuration",
+    "daysOverdue"
+  ],
+  "categoricalFeatures": [
+    "type",
+    "paymentMethod",
+    "failureReason",
+    "customerSegment",
+    "deviceType"
+  ],
+  "featureNames": [
+    "amount",
+    "attemptCount",
+    "prevSuccessfulPayments",
+    "prevFailedPayments",
+    "prevRecoveries",
+    "checkoutDuration",
+    "daysOverdue",
+    "type",
+    "paymentMethod",
+    "failureReason",
+    "customerSegment",
+    "deviceType"
+  ]
+}

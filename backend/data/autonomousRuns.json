@@ -1,0 +1,1000 @@
+[
+  {
+    "agentRunId": "AGENT-1788533857083-1icce",
+    "transactionId": "DEMO-1788533853175",
+    "source": "demo",
+    "status": "COMPLETED",
+    "currentStage": "AUDIT",
+    "stages": {
+      "detect": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T14:57:37.084Z",
+        "result": {
+          "transactionId": "DEMO-1788533853175",
+          "source": "demo",
+          "amount": 1500,
+          "type": "Failed Payment",
+          "failureReason": "Payment failed"
+        }
+      },
+      "diagnose": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T14:57:37.086Z",
+        "result": {
+          "problem": "Payment failed due to payment failed",
+          "rootCause": "Payment failure requires further investigation",
+          "recoverability": 97,
+          "riskScore": 41,
+          "recommendedAction": "Email Reminder",
+          "confidence": 59,
+          "mlPrediction": {
+            "mlAvailable": true,
+            "recoverability": {
+              "prediction": "recoverable",
+              "probability": 0.9708
+            },
+            "riskScore": {
+              "prediction": 41
+            },
+            "action": {
+              "prediction": "Email Reminder",
+              "confidence": 0.59,
+              "probabilities": {
+                "Card Update Request": 0.0341,
+                "Email Reminder": 0.5873,
+                "Human Escalation": 0.0026,
+                "No Action": 0.0226,
+                "Payment Link": 0.0014,
+                "Smart Retry": 0.005,
+                "UPI Fallback": 0.0209,
+                "WhatsApp Reminder": 0.3261
+              }
+            },
+            "reasoning": [
+              "High recovery potential (97% probability)",
+              "Moderate risk score",
+              "ML confidence in action: 59%"
+            ]
+          }
+        }
+      },
+      "decide": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T14:57:37.087Z",
+        "result": {
+          "aiRecommendation": "Email Reminder",
+          "finalAction": "Email Reminder",
+          "reason": "Customer engagement via email to recover payment",
+          "recoverability": 97,
+          "riskScore": 41,
+          "confidence": 0.59,
+          "mlAction": "Email Reminder"
+        }
+      },
+      "policy": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T14:57:37.091Z",
+        "result": {
+          "passed": true,
+          "allowedAction": "Email Reminder",
+          "requiresApproval": false,
+          "message": "Policy check passed"
+        }
+      },
+      "execute": {
+        "status": "COMPLETED",
+        "result": {
+          "status": "NOT_SUPPORTED",
+          "action": "Email Reminder",
+          "reason": "Action not supported for automatic execution"
+        },
+        "timestamp": "2026-09-04T14:57:37.091Z"
+      },
+      "recover": {
+        "status": "PENDING"
+      },
+      "audit": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T14:57:37.091Z",
+        "result": {
+          "agentRunId": "AGENT-1788533857083-1icce",
+          "transactionId": "DEMO-1788533853175",
+          "aiRecommendation": "Email Reminder",
+          "policyResult": "APPROVED",
+          "finalAction": "Email Reminder",
+          "executionStatus": "NOT_SUPPORTED",
+          "recoveryStatus": "NOT_SUPPORTED"
+        }
+      }
+    },
+    "startedAt": "2026-09-04T14:57:37.083Z",
+    "completedAt": "2026-09-04T14:57:37.092Z"
+  },
+  {
+    "agentRunId": "AGENT-1788534052284-iohja",
+    "transactionId": "DEMO-1788534048382",
+    "source": "demo",
+    "status": "COMPLETED",
+    "currentStage": "AUDIT",
+    "stages": {
+      "detect": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:00:52.285Z",
+        "result": {
+          "transactionId": "DEMO-1788534048382",
+          "source": "demo",
+          "amount": 1500,
+          "type": "Failed Payment",
+          "failureReason": "Payment failed"
+        }
+      },
+      "diagnose": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:00:52.287Z",
+        "result": {
+          "problem": "Payment failed due to payment failed",
+          "rootCause": "Payment failure requires further investigation",
+          "recoverability": 97,
+          "riskScore": 41,
+          "recommendedAction": "Email Reminder",
+          "confidence": 59,
+          "mlPrediction": {
+            "mlAvailable": true,
+            "recoverability": {
+              "prediction": "recoverable",
+              "probability": 0.9708
+            },
+            "riskScore": {
+              "prediction": 41
+            },
+            "action": {
+              "prediction": "Email Reminder",
+              "confidence": 0.59,
+              "probabilities": {
+                "Card Update Request": 0.0341,
+                "Email Reminder": 0.5873,
+                "Human Escalation": 0.0026,
+                "No Action": 0.0226,
+                "Payment Link": 0.0014,
+                "Smart Retry": 0.005,
+                "UPI Fallback": 0.0209,
+                "WhatsApp Reminder": 0.3261
+              }
+            },
+            "reasoning": [
+              "High recovery potential (97% probability)",
+              "Moderate risk score",
+              "ML confidence in action: 59%"
+            ]
+          }
+        }
+      },
+      "decide": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:00:52.288Z",
+        "result": {
+          "aiRecommendation": "Email Reminder",
+          "finalAction": "Email Reminder",
+          "reason": "Customer engagement via email to recover payment",
+          "recoverability": 97,
+          "riskScore": 41,
+          "confidence": 0.59,
+          "mlAction": "Email Reminder"
+        }
+      },
+      "policy": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:00:52.292Z",
+        "result": {
+          "passed": true,
+          "allowedAction": "Email Reminder",
+          "requiresApproval": false,
+          "message": "Policy check passed"
+        }
+      },
+      "execute": {
+        "status": "COMPLETED",
+        "result": {
+          "status": "NOT_SUPPORTED",
+          "action": "Email Reminder",
+          "reason": "Action not supported for automatic execution"
+        },
+        "timestamp": "2026-09-04T15:00:52.292Z"
+      },
+      "recover": {
+        "status": "PENDING"
+      },
+      "audit": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:00:52.292Z",
+        "result": {
+          "agentRunId": "AGENT-1788534052284-iohja",
+          "transactionId": "DEMO-1788534048382",
+          "aiRecommendation": "Email Reminder",
+          "policyResult": "APPROVED",
+          "finalAction": "Email Reminder",
+          "executionStatus": "NOT_SUPPORTED",
+          "recoveryStatus": "NOT_SUPPORTED"
+        }
+      }
+    },
+    "startedAt": "2026-09-04T15:00:52.284Z",
+    "completedAt": "2026-09-04T15:00:52.293Z"
+  },
+  {
+    "agentRunId": "AGENT-1788534062468-tgwhz",
+    "transactionId": "DEMO-1788534048383",
+    "source": "demo",
+    "status": "RUNNING",
+    "currentStage": "POLICY",
+    "stages": {
+      "detect": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:01:02.468Z",
+        "result": {
+          "transactionId": "DEMO-1788534048383",
+          "source": "demo",
+          "amount": 50000,
+          "type": "Failed Payment",
+          "failureReason": "Card declined"
+        }
+      },
+      "diagnose": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:01:02.471Z",
+        "result": {
+          "problem": "Payment failed due to card declined",
+          "rootCause": "Payment failure requires further investigation",
+          "recoverability": 97,
+          "riskScore": 41,
+          "recommendedAction": "UPI Fallback",
+          "confidence": 42,
+          "mlPrediction": {
+            "mlAvailable": true,
+            "recoverability": {
+              "prediction": "recoverable",
+              "probability": 0.9657
+            },
+            "riskScore": {
+              "prediction": 41
+            },
+            "action": {
+              "prediction": "UPI Fallback",
+              "confidence": 0.42,
+              "probabilities": {
+                "Card Update Request": 0.3247,
+                "Email Reminder": 0.0221,
+                "Human Escalation": 0.0015,
+                "No Action": 0.0057,
+                "Payment Link": 0.001,
+                "Smart Retry": 0.0209,
+                "UPI Fallback": 0.4199,
+                "WhatsApp Reminder": 0.2042
+              }
+            },
+            "reasoning": [
+              "High recovery potential (97% probability)",
+              "Moderate risk score",
+              "ML confidence in action: 42%"
+            ]
+          }
+        }
+      },
+      "decide": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:01:02.473Z",
+        "result": {
+          "aiRecommendation": "UPI Fallback",
+          "finalAction": "Human Escalation",
+          "reason": "ML recommended \"UPI Fallback\" but guardrails changed it to \"Human Escalation\": Automatic recovery blocked because transaction amount ₹50000 exceeds the ₹25000 limit.",
+          "recoverability": 97,
+          "riskScore": 41,
+          "confidence": 0.42,
+          "mlAction": "UPI Fallback"
+        }
+      },
+      "policy": {
+        "status": "APPROVAL_REQUIRED",
+        "timestamp": "2026-09-04T15:01:02.476Z",
+        "result": {
+          "passed": false,
+          "allowedAction": "Human Escalation",
+          "requiresApproval": true,
+          "failedGuardrails": [
+            {
+              "passed": false,
+              "guardrail": "Automatic Recovery Amount",
+              "reason": "Automatic recovery blocked because transaction amount ₹50000 exceeds the ₹25000 limit."
+            }
+          ],
+          "message": "Action requires human approval"
+        }
+      },
+      "execute": {
+        "status": "PENDING"
+      },
+      "recover": {
+        "status": "PENDING"
+      },
+      "audit": {
+        "status": "PENDING"
+      }
+    },
+    "startedAt": "2026-09-04T15:01:02.468Z",
+    "completedAt": "2026-09-04T15:01:02.476Z",
+    "approvalDecision": "APPROVED",
+    "approvedAt": "2026-09-04T15:02:40.258Z"
+  },
+  {
+    "agentRunId": "AGENT-1788534088769-ps332",
+    "transactionId": "DEMO-1788534048384",
+    "source": "demo",
+    "status": "COMPLETED",
+    "currentStage": "AUDIT",
+    "stages": {
+      "detect": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:01:28.769Z",
+        "result": {
+          "transactionId": "DEMO-1788534048384",
+          "source": "demo",
+          "amount": 5000,
+          "type": "Failed Payment",
+          "failureReason": "Fraud suspected"
+        }
+      },
+      "diagnose": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:01:28.771Z",
+        "result": {
+          "problem": "Payment failed due to fraud suspected",
+          "rootCause": "Payment failure requires further investigation",
+          "recoverability": 88,
+          "riskScore": 41,
+          "recommendedAction": "Email Reminder",
+          "confidence": 32,
+          "mlPrediction": {
+            "mlAvailable": true,
+            "recoverability": {
+              "prediction": "recoverable",
+              "probability": 0.8759
+            },
+            "riskScore": {
+              "prediction": 41
+            },
+            "action": {
+              "prediction": "Email Reminder",
+              "confidence": 0.32,
+              "probabilities": {
+                "Card Update Request": 0.239,
+                "Email Reminder": 0.3202,
+                "Human Escalation": 0.003,
+                "No Action": 0.1568,
+                "Payment Link": 0.0023,
+                "Smart Retry": 0.0036,
+                "UPI Fallback": 0.0791,
+                "WhatsApp Reminder": 0.1959
+              }
+            },
+            "reasoning": [
+              "High recovery potential (88% probability)",
+              "Moderate risk score",
+              "ML confidence in action: 32%"
+            ]
+          }
+        }
+      },
+      "decide": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:01:28.772Z",
+        "result": {
+          "aiRecommendation": "Email Reminder",
+          "finalAction": "Email Reminder",
+          "reason": "Customer engagement via email to recover payment",
+          "recoverability": 88,
+          "riskScore": 41,
+          "confidence": 0.32,
+          "mlAction": "Email Reminder"
+        }
+      },
+      "policy": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:01:28.775Z",
+        "result": {
+          "passed": true,
+          "allowedAction": "Email Reminder",
+          "requiresApproval": false,
+          "message": "Policy check passed"
+        }
+      },
+      "execute": {
+        "status": "COMPLETED",
+        "result": {
+          "status": "NOT_SUPPORTED",
+          "action": "Email Reminder",
+          "reason": "Action not supported for automatic execution"
+        },
+        "timestamp": "2026-09-04T15:01:28.775Z"
+      },
+      "recover": {
+        "status": "PENDING"
+      },
+      "audit": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:01:28.775Z",
+        "result": {
+          "agentRunId": "AGENT-1788534088769-ps332",
+          "transactionId": "DEMO-1788534048384",
+          "aiRecommendation": "Email Reminder",
+          "policyResult": "APPROVED",
+          "finalAction": "Email Reminder",
+          "executionStatus": "NOT_SUPPORTED",
+          "recoveryStatus": "NOT_SUPPORTED"
+        }
+      }
+    },
+    "startedAt": "2026-09-04T15:01:28.769Z",
+    "completedAt": "2026-09-04T15:01:28.776Z"
+  },
+  {
+    "agentRunId": "AGENT-1788534127817-c0z6e",
+    "transactionId": "DEMO-1788534123924",
+    "source": "demo",
+    "status": "COMPLETED",
+    "currentStage": "AUDIT",
+    "stages": {
+      "detect": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:02:09.945Z",
+        "result": {
+          "transactionId": "DEMO-1788534123924",
+          "source": "demo",
+          "amount": 2000,
+          "type": "Failed Payment",
+          "failureReason": "Card declined"
+        }
+      },
+      "diagnose": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:02:09.947Z",
+        "result": {
+          "problem": "Payment failed due to card declined",
+          "rootCause": "Payment failure requires further investigation",
+          "recoverability": 97,
+          "riskScore": 41,
+          "recommendedAction": "Email Reminder",
+          "confidence": 81,
+          "mlPrediction": {
+            "mlAvailable": true,
+            "recoverability": {
+              "prediction": "recoverable",
+              "probability": 0.9677
+            },
+            "riskScore": {
+              "prediction": 41
+            },
+            "action": {
+              "prediction": "Email Reminder",
+              "confidence": 0.81,
+              "probabilities": {
+                "Card Update Request": 0.0136,
+                "Email Reminder": 0.807,
+                "Human Escalation": 0.0014,
+                "No Action": 0.0073,
+                "Payment Link": 0.0016,
+                "Smart Retry": 0.004,
+                "UPI Fallback": 0.0355,
+                "WhatsApp Reminder": 0.1297
+              }
+            },
+            "reasoning": [
+              "High recovery potential (97% probability)",
+              "Moderate risk score",
+              "ML confidence in action: 81%"
+            ]
+          }
+        }
+      },
+      "decide": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:02:09.949Z",
+        "result": {
+          "aiRecommendation": "Email Reminder",
+          "finalAction": "Email Reminder",
+          "reason": "Customer engagement via email to recover payment",
+          "recoverability": 97,
+          "riskScore": 41,
+          "confidence": 0.81,
+          "mlAction": "Email Reminder"
+        }
+      },
+      "policy": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:02:09.951Z",
+        "result": {
+          "passed": true,
+          "allowedAction": "Email Reminder",
+          "requiresApproval": false,
+          "message": "Policy check passed"
+        }
+      },
+      "execute": {
+        "status": "COMPLETED",
+        "result": {
+          "status": "NOT_SUPPORTED",
+          "action": "Email Reminder",
+          "reason": "Action not supported for automatic execution"
+        },
+        "timestamp": "2026-09-04T15:02:09.951Z"
+      },
+      "recover": {
+        "status": "PENDING"
+      },
+      "audit": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:02:09.951Z",
+        "result": {
+          "agentRunId": "AGENT-1788534127817-c0z6e",
+          "transactionId": "DEMO-1788534123924",
+          "aiRecommendation": "Email Reminder",
+          "policyResult": "APPROVED",
+          "finalAction": "Email Reminder",
+          "executionStatus": "NOT_SUPPORTED",
+          "recoveryStatus": "NOT_SUPPORTED"
+        }
+      }
+    },
+    "startedAt": "2026-09-04T15:02:07.818Z",
+    "completedAt": "2026-09-04T15:02:09.952Z"
+  },
+  {
+    "agentRunId": "AGENT-1788534712665-rw8rn",
+    "transactionId": "DEMO-1788534554942",
+    "source": "demo",
+    "status": "COMPLETED",
+    "currentStage": "AUDIT",
+    "stages": {
+      "detect": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:11:52.666Z",
+        "result": {
+          "transactionId": "DEMO-1788534554942",
+          "source": "demo",
+          "amount": 2199,
+          "type": "Abandoned Checkout",
+          "failureReason": "Checkout Abandoned"
+        }
+      },
+      "diagnose": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:11:52.670Z",
+        "result": {
+          "problem": "Checkout was abandoned due to checkout abandoned",
+          "rootCause": "Customer dropped off before completing payment",
+          "recoverability": 77,
+          "riskScore": 53,
+          "recommendedAction": "UPI Fallback",
+          "confidence": 41,
+          "mlPrediction": {
+            "mlAvailable": true,
+            "recoverability": {
+              "prediction": "recoverable",
+              "probability": 0.7739
+            },
+            "riskScore": {
+              "prediction": 53
+            },
+            "action": {
+              "prediction": "UPI Fallback",
+              "confidence": 0.41,
+              "probabilities": {
+                "Card Update Request": 0.0068,
+                "Email Reminder": 0.0299,
+                "Human Escalation": 0.0815,
+                "No Action": 0.2441,
+                "Payment Link": 0.0047,
+                "Smart Retry": 0.0004,
+                "UPI Fallback": 0.4087,
+                "WhatsApp Reminder": 0.224
+              }
+            },
+            "reasoning": [
+              "High recovery potential (77% probability)",
+              "Moderate risk score",
+              "Customer intent exists, re-engagement possible",
+              "ML confidence in action: 41%"
+            ]
+          }
+        }
+      },
+      "decide": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:11:52.673Z",
+        "result": {
+          "aiRecommendation": "UPI Fallback",
+          "finalAction": "UPI Fallback",
+          "reason": "UPI provides an alternative payment method",
+          "recoverability": 77,
+          "riskScore": 53,
+          "confidence": 0.41,
+          "mlAction": "UPI Fallback"
+        }
+      },
+      "policy": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:11:52.679Z",
+        "result": {
+          "passed": true,
+          "allowedAction": "UPI Fallback",
+          "requiresApproval": false,
+          "message": "Policy check passed"
+        }
+      },
+      "execute": {
+        "status": "COMPLETED",
+        "result": {
+          "status": "NOT_SUPPORTED",
+          "action": "UPI Fallback",
+          "reason": "Action not supported for automatic execution"
+        },
+        "timestamp": "2026-09-04T15:11:52.679Z"
+      },
+      "recover": {
+        "status": "PENDING"
+      },
+      "audit": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:11:52.680Z",
+        "result": {
+          "agentRunId": "AGENT-1788534712665-rw8rn",
+          "transactionId": "DEMO-1788534554942",
+          "aiRecommendation": "UPI Fallback",
+          "policyResult": "APPROVED",
+          "finalAction": "UPI Fallback",
+          "executionStatus": "NOT_SUPPORTED",
+          "recoveryStatus": "NOT_SUPPORTED"
+        }
+      }
+    },
+    "startedAt": "2026-09-04T15:11:52.665Z",
+    "completedAt": "2026-09-04T15:11:52.680Z"
+  },
+  {
+    "agentRunId": "AGENT-1788534872000-xljrc",
+    "transactionId": "TXN-2847020",
+    "source": "manual",
+    "status": "HUMAN_APPROVAL_REQUIRED",
+    "currentStage": "POLICY",
+    "stages": {
+      "detect": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:18:38.357Z",
+        "result": {
+          "transactionId": "TXN-2847020",
+          "source": "historical",
+          "amount": 80871,
+          "type": "Abandoned Checkout",
+          "failureReason": "Price Changed"
+        }
+      },
+      "diagnose": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:18:38.363Z",
+        "result": {
+          "problem": "Checkout was abandoned due to price changed",
+          "rootCause": "Checkout amount changed before payment completion",
+          "recoverability": 100,
+          "riskScore": 33,
+          "recommendedAction": "WhatsApp Reminder",
+          "confidence": 55,
+          "mlPrediction": {
+            "mlAvailable": true,
+            "recoverability": {
+              "prediction": "recoverable",
+              "probability": 0.9986
+            },
+            "riskScore": {
+              "prediction": 33
+            },
+            "action": {
+              "prediction": "WhatsApp Reminder",
+              "confidence": 0.55,
+              "probabilities": {
+                "Card Update Request": 0.1312,
+                "Email Reminder": 0.0287,
+                "Human Escalation": 0.0614,
+                "No Action": 0.0016,
+                "Payment Link": 0.2181,
+                "Smart Retry": 0.0012,
+                "UPI Fallback": 0.0058,
+                "WhatsApp Reminder": 0.552
+              }
+            },
+            "reasoning": [
+              "High recovery potential (100% probability)",
+              "Low risk score favors recovery",
+              "ML confidence in action: 55%"
+            ]
+          }
+        }
+      },
+      "decide": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:18:38.364Z",
+        "result": {
+          "aiRecommendation": "WhatsApp Reminder",
+          "finalAction": "Human Escalation",
+          "reason": "ML recommended \"WhatsApp Reminder\" but guardrails changed it to \"Human Escalation\": Automatic recovery blocked because transaction amount ₹80871 exceeds the ₹25000 limit.",
+          "recoverability": 100,
+          "riskScore": 33,
+          "confidence": 0.55,
+          "mlAction": "WhatsApp Reminder"
+        }
+      },
+      "policy": {
+        "status": "APPROVAL_REQUIRED",
+        "timestamp": "2026-09-04T15:18:38.368Z",
+        "result": {
+          "passed": false,
+          "allowedAction": "Human Escalation",
+          "requiresApproval": true,
+          "failedGuardrails": [
+            {
+              "passed": false,
+              "guardrail": "Automatic Recovery Amount",
+              "reason": "Automatic recovery blocked because transaction amount ₹80871 exceeds the ₹25000 limit."
+            }
+          ],
+          "message": "Action requires human approval"
+        }
+      },
+      "execute": {
+        "status": "PENDING"
+      },
+      "recover": {
+        "status": "PENDING"
+      },
+      "audit": {
+        "status": "PENDING"
+      }
+    },
+    "startedAt": "2026-09-04T15:14:32.000Z",
+    "completedAt": "2026-09-04T15:18:38.368Z"
+  },
+  {
+    "agentRunId": "AGENT-1788535214348-k5d5u",
+    "transactionId": "DEMO-1788534554943",
+    "source": "demo",
+    "status": "COMPLETED",
+    "currentStage": "AUDIT",
+    "stages": {
+      "detect": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:20:14.349Z",
+        "result": {
+          "transactionId": "DEMO-1788534554943",
+          "source": "demo",
+          "amount": 1500,
+          "type": "Failed Payment",
+          "failureReason": "Card Declined"
+        }
+      },
+      "diagnose": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:20:14.354Z",
+        "result": {
+          "problem": "Payment failed due to card declined",
+          "rootCause": "Issuing bank declined the card transaction",
+          "recoverability": 45,
+          "riskScore": 45,
+          "recommendedAction": "Human Escalation",
+          "confidence": 37,
+          "mlPrediction": {
+            "mlAvailable": true,
+            "recoverability": {
+              "prediction": "not_recoverable",
+              "probability": 0.4536
+            },
+            "riskScore": {
+              "prediction": 45
+            },
+            "action": {
+              "prediction": "Human Escalation",
+              "confidence": 0.37,
+              "probabilities": {
+                "Card Update Request": 0.0329,
+                "Email Reminder": 0.0748,
+                "Human Escalation": 0.3658,
+                "No Action": 0.0724,
+                "Payment Link": 0.0807,
+                "Smart Retry": 0.0075,
+                "UPI Fallback": 0.0095,
+                "WhatsApp Reminder": 0.3565
+              }
+            },
+            "reasoning": [
+              "Low recovery potential (45% probability)",
+              "Moderate risk score",
+              "May benefit from alternative payment method",
+              "ML confidence in action: 37%"
+            ]
+          }
+        }
+      },
+      "decide": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:20:14.356Z",
+        "result": {
+          "aiRecommendation": "Human Escalation",
+          "finalAction": "Human Escalation",
+          "reason": "ML confidence too low for automated action or guardrail blocked automatic recovery",
+          "recoverability": 45,
+          "riskScore": 45,
+          "confidence": 0.37,
+          "mlAction": "Human Escalation"
+        }
+      },
+      "policy": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:20:14.361Z",
+        "result": {
+          "passed": true,
+          "allowedAction": "Human Escalation",
+          "requiresApproval": false,
+          "message": "Policy check passed"
+        }
+      },
+      "execute": {
+        "status": "COMPLETED",
+        "result": {
+          "status": "NOT_SUPPORTED",
+          "action": "Human Escalation",
+          "reason": "Action not supported for automatic execution"
+        },
+        "timestamp": "2026-09-04T15:20:14.362Z"
+      },
+      "recover": {
+        "status": "PENDING"
+      },
+      "audit": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:20:14.363Z",
+        "result": {
+          "agentRunId": "AGENT-1788535214348-k5d5u",
+          "transactionId": "DEMO-1788534554943",
+          "aiRecommendation": "Human Escalation",
+          "policyResult": "APPROVED",
+          "finalAction": "Human Escalation",
+          "executionStatus": "NOT_SUPPORTED",
+          "recoveryStatus": "NOT_SUPPORTED"
+        }
+      }
+    },
+    "startedAt": "2026-09-04T15:20:14.348Z",
+    "completedAt": "2026-09-04T15:20:14.363Z"
+  },
+  {
+    "agentRunId": "AGENT-1788535405132-8a0bq",
+    "transactionId": "DEMO-1788534554944",
+    "source": "demo",
+    "status": "COMPLETED",
+    "currentStage": "AUDIT",
+    "stages": {
+      "detect": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:23:25.133Z",
+        "result": {
+          "transactionId": "DEMO-1788534554944",
+          "source": "demo",
+          "amount": 2000,
+          "type": "Failed Payment",
+          "failureReason": "Network Error"
+        }
+      },
+      "diagnose": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:23:25.136Z",
+        "result": {
+          "problem": "Payment failed due to network error",
+          "rootCause": "Temporary network or payment gateway connectivity issue",
+          "recoverability": 100,
+          "riskScore": 26,
+          "recommendedAction": "Smart Retry",
+          "confidence": 100,
+          "mlPrediction": {
+            "mlAvailable": true,
+            "recoverability": {
+              "prediction": "recoverable",
+              "probability": 0.9975
+            },
+            "riskScore": {
+              "prediction": 26
+            },
+            "action": {
+              "prediction": "Smart Retry",
+              "confidence": 1,
+              "probabilities": {
+                "Card Update Request": 0.0002,
+                "Email Reminder": 0.0002,
+                "Human Escalation": 0.001,
+                "No Action": 0.0004,
+                "Payment Link": 0.0002,
+                "Smart Retry": 0.9974,
+                "UPI Fallback": 0,
+                "WhatsApp Reminder": 0.0006
+              }
+            },
+            "reasoning": [
+              "High recovery potential (100% probability)",
+              "Low risk score favors recovery",
+              "Temporary connectivity issue",
+              "ML confidence in action: 100%"
+            ]
+          }
+        }
+      },
+      "decide": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:23:25.138Z",
+        "result": {
+          "aiRecommendation": "Smart Retry",
+          "finalAction": "Smart Retry",
+          "reason": "Network Error may be resolved with a retry per ML analysis",
+          "recoverability": 100,
+          "riskScore": 26,
+          "confidence": 1,
+          "mlAction": "Smart Retry"
+        }
+      },
+      "policy": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:23:25.142Z",
+        "result": {
+          "passed": true,
+          "allowedAction": "Smart Retry",
+          "requiresApproval": false,
+          "message": "Policy check passed"
+        }
+      },
+      "execute": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:23:25.444Z",
+        "result": {
+          "executed": true,
+          "status": "ORDER_CREATED",
+          "action": "Smart Retry",
+          "provider": "Razorpay",
+          "mode": "TEST",
+          "amount": 2000,
+          "razorpayOrderId": "order_TY0Y0xSbpdBxkV",
+          "orderStatus": "created"
+        }
+      },
+      "recover": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:23:25.446Z",
+        "result": {
+          "status": "PENDING",
+          "executed": true,
+          "action": "Smart Retry",
+          "message": "Recovery action executed. Awaiting customer response."
+        }
+      },
+      "audit": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:23:25.447Z",
+        "result": {
+          "agentRunId": "AGENT-1788535405132-8a0bq",
+          "transactionId": "DEMO-1788534554944",
+          "aiRecommendation": "Smart Retry",
+          "policyResult": "APPROVED",
+          "finalAction": "Smart Retry",
+          "executionStatus": "ORDER_CREATED",
+          "recoveryStatus": "PENDING"
+        }
+      }
+    },
+    "startedAt": "2026-09-04T15:23:25.132Z",
+    "completedAt": "2026-09-04T15:23:25.448Z"
+  }
+]

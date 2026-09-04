@@ -1,0 +1,43 @@
+{
+  "type": [
+    "Abandoned Checkout",
+    "Failed Payment",
+    "Subscription Failure"
+  ],
+  "paymentMethod": [
+    "Credit Card",
+    "Debit Card",
+    "Net Banking",
+    "UPI",
+    "Wallet"
+  ],
+  "failureReason": [
+    "3D Secure Authentication Failed",
+    "AutoPay Mandate Failed",
+    "Bank Account Unavailable",
+    "Bank Server Timeout",
+    "Card Declined",
+    "Checkout Abandoned",
+    "Customer Drop-off",
+    "Daily Limit Exceeded",
+    "Debit Mandate Failed",
+    "Expired Card",
+    "Insufficient Funds",
+    "Network Error",
+    "Payment Method Expired",
+    "Payment Method Unavailable",
+    "Payment Page Timeout",
+    "Price Changed"
+  ],
+  "customerSegment": [
+    "High Value",
+    "Loyal",
+    "New",
+    "Regular"
+  ],
+  "deviceType": [
+    "Desktop",
+    "Mobile",
+    "Tablet"
+  ]
+}

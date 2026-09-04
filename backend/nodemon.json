@@ -1,5 +1,5 @@
 {
   "watch": ["src"],
-  "ignore": ["src/data/*.json", "data/*.json", "*.json", "node_modules"],
+  "ignore": ["src/data/*.json", "data/*.json", "*.json", "node_modules", "src/ml/artifacts/*.json"],
   "ext": "js,mjs"
 }

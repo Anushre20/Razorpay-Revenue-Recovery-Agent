@@ -80,6 +80,7 @@ export interface Diagnosis {
     previousFailedPayments: number;
     previousRecoveries: number;
   };
+  mlPrediction?: MLPrediction;
 }
 
 export interface DiagnosisResponse {
@@ -125,6 +126,7 @@ export interface RecoveryDecision {
     checks: Record<string, boolean>;
     policy: Record<string, number>;
   };
+  mlPrediction?: MLPrediction;
 }
 
 export interface GuardrailCheckResult {
@@ -313,6 +315,57 @@ export interface EvaluationData {
 
 export const fetchEvaluation = () => apiGet<{ success: boolean; data: EvaluationData }>('/api/evaluation');
 
+// --- ML Types ---
+export interface MLPrediction {
+  mlAvailable: boolean;
+  recoverability?: {
+    prediction: string;
+    probability: number;
+  };
+  riskScore?: {
+    prediction: number;
+  };
+  action?: {
+    prediction: string;
+    confidence: number;
+    probabilities: Record<string, number>;
+  };
+  reasoning?: string[];
+  error?: string;
+}
+
+export interface MLModelMetrics {
+  loaded: boolean;
+  totalTransactions?: number;
+  trainSize?: number;
+  testSize?: number;
+  featureCount?: number;
+  features?: string[];
+  recoverability?: {
+    accuracy: number;
+    precision: number;
+    recall: number;
+    f1Score: number;
+    featureImportances: Record<string, number>;
+  };
+  riskScore?: {
+    mae: number;
+    rmse: number;
+    r2Score: number;
+    featureImportances: Record<string, number>;
+  };
+  action?: {
+    accuracy: number;
+    macroPrecision: number;
+    macroRecall: number;
+    macroF1: number;
+    perClass: Record<string, { precision: number; recall: number; f1Score: number }>;
+    featureImportances: Record<string, number>;
+  };
+}
+
+export const fetchMLMetrics = () => apiGet<{ success: boolean; data: MLModelMetrics }>('/api/evaluation/ml-metrics');
+
 // --- Integration Types ---
 export interface IntegrationStatus {
   success: boolean;
@@ -365,3 +418,51 @@ export interface EvaluateResponse {
 
 export const evaluateTransaction = (data: EvaluateRequest) =>
   apiPost<EvaluateResponse>('/api/transactions/evaluate', data);
+
+// --- Agent Types ---
+export interface AgentStage {
+  status: string;
+  timestamp?: string;
+  result?: Record<string, unknown>;
+  error?: string;
+}
+
+export interface AgentRun {
+  agentRunId: string;
+  transactionId: string;
+  source: string;
+  status: string;
+  currentStage: string;
+  stages: {
+    detect: AgentStage;
+    diagnose: AgentStage;
+    decide: AgentStage;
+    policy: AgentStage;
+    execute: AgentStage;
+    recover: AgentStage;
+    audit: AgentStage;
+  };
+  startedAt: string;
+  completedAt: string | null;
+  error?: string;
+  approvalDecision?: string;
+}
+
+export interface AgentStats {
+  total: number;
+  running: number;
+  completed: number;
+  blocked: number;
+  humanApproval: number;
+  executionFailed: number;
+  failed: number;
+  rejected: number;
+}
+
+export const fetchAgentRuns = () => apiGet<{ success: boolean; count: number; data: AgentRun[] }>('/api/agent/runs');
+export const fetchAgentRun = (agentRunId: string) => apiGet<{ success: boolean; data: AgentRun }>(`/api/agent/runs/${agentRunId}`);
+export const fetchAgentRunForTxn = (txnId: string) => apiGet<{ success: boolean; data: AgentRun }>(`/api/agent/recovery/${txnId}`);
+export const triggerAgentRecovery = (txnId: string) => apiPost<{ success: boolean; data: AgentRun; skipped?: boolean; reason?: string }>(`/api/agent/recovery/${txnId}`);
+export const approveAgentRun = (agentRunId: string) => apiPost<{ success: boolean; data: AgentRun }>(`/api/agent/runs/${agentRunId}/approve`);
+export const rejectAgentRun = (agentRunId: string) => apiPost<{ success: boolean; data: AgentRun }>(`/api/agent/runs/${agentRunId}/reject`);
+export const fetchAgentStats = () => apiGet<{ success: boolean; data: AgentStats }>('/api/agent/stats');

@@ -1,4 +1,5 @@
 import { findTransaction } from './transactionStore.js'
+import { predictAll } from './mlInferenceService.js'
 
 function getProblem(transaction) {
   const { type, failureReason } = transaction
@@ -85,112 +86,20 @@ function getRootCause(transaction) {
   }
 }
 
-function calculateConfidence(transaction) {
-  let confidence = 70
-
-  if (transaction.failureReason) {
-    confidence += 10
-  }
-
-  if (transaction.attemptCount >= 2) {
-    confidence += 5
-  }
-
-  if (
-    transaction.customerHistory.previousSuccessfulPayments >= 5
-  ) {
-    confidence += 5
-  }
-
-  if (
-    transaction.customerHistory.previousFailedPayments >= 6
-  ) {
-    confidence += 5
-  }
-
-  return Math.min(98, confidence)
-}
-
-function getUrgency(transaction) {
-  if (
-    transaction.amount >= 100000 ||
-    transaction.riskScore >= 80
-  ) {
+function getUrgency(riskScore, amount) {
+  if (amount >= 100000 || riskScore >= 80) {
     return 'Critical'
   }
 
-  if (
-    transaction.amount >= 50000 ||
-    transaction.riskScore >= 60
-  ) {
+  if (amount >= 50000 || riskScore >= 60) {
     return 'High'
   }
 
-  if (transaction.riskScore >= 40) {
+  if (riskScore >= 40) {
     return 'Medium'
   }
 
   return 'Low'
-}
-
-function getRecommendedAction(transaction) {
-  const {
-    type,
-    failureReason,
-    amount,
-    recoverability,
-  } = transaction
-
-  // Not enough recovery potential
-  if (recoverability < 30) {
-    return 'No Action'
-  }
-
-  // Known payment credential problem
-  if (
-    failureReason === 'Expired Card' ||
-    failureReason === 'Payment Method Expired'
-  ) {
-    return 'Card Update Request'
-  }
-
-  // Temporary payment failures
-  if (
-    failureReason === 'Insufficient Funds' ||
-    failureReason === 'Bank Server Timeout' ||
-    failureReason === 'Network Error'
-  ) {
-    return 'Smart Retry'
-  }
-
-  // Abandoned checkout
-  if (
-    type === 'Abandoned Checkout' &&
-    recoverability >= 60
-  ) {
-    return 'Payment Link'
-  }
-
-  // Subscription recovery
-  if (
-    type === 'Subscription Failure' &&
-    recoverability >= 60
-  ) {
-    return 'UPI Fallback'
-  }
-
-  // Card declines need an alternate payment method
-  if (failureReason === 'Card Declined') {
-    return 'UPI Fallback'
-  }
-
-  // Low-value cases can be handled automatically
-  if (amount <= 25000 && recoverability >= 50) {
-    return 'Payment Link'
-  }
-
-  // Unknown/high-risk cases are escalated
-  return 'Human Escalation'
 }
 
 function getAlternatePayments(transaction) {
@@ -219,15 +128,12 @@ function getAlternatePayments(transaction) {
   return filtered.slice(0, 3)
 }
 
-function calculateEstimatedRecovery(transaction) {
-  if (!transaction.groundTruthRecoverable) {
+function calculateEstimatedRecovery(amount, recoverabilityProbability, isRecoverable) {
+  if (!isRecoverable) {
     return 0
   }
 
-  return Math.round(
-    transaction.amount *
-      (transaction.recoverability / 100),
-  )
+  return Math.round(amount * recoverabilityProbability)
 }
 
 export function diagnoseTransaction(txnId) {
@@ -237,8 +143,69 @@ export function diagnoseTransaction(txnId) {
     return null
   }
 
-  const recommendedAction =
-    getRecommendedAction(transaction)
+  const ml = predictAll(transaction)
+
+  if (ml.mlAvailable) {
+    const mlRiskScore = ml.riskScore.prediction
+    const mlRecoverabilityProbability = ml.recoverability.probability
+    const mlIsRecoverable = ml.recoverability.prediction === 'recoverable'
+    const mlRecoverabilityPct = Math.round(mlRecoverabilityProbability * 100)
+    const mlAction = ml.action.prediction
+    const mlConfidence = Math.round(ml.action.confidence * 100)
+
+    return {
+      transactionId: transaction.id,
+
+      problem: getProblem(transaction),
+
+      rootCause: getRootCause(transaction),
+
+      confidence: mlConfidence,
+
+      urgency: getUrgency(mlRiskScore, transaction.amount),
+
+      recommendedAction: mlAction,
+
+      alternatePayments:
+        getAlternatePayments(transaction),
+
+      estimatedRecovery:
+        calculateEstimatedRecovery(transaction.amount, mlRecoverabilityProbability, mlIsRecoverable),
+
+      riskScore: mlRiskScore,
+
+      recoverability: mlRecoverabilityPct,
+
+      failureReason: transaction.failureReason,
+
+      attemptCount: transaction.attemptCount,
+
+      analysis: {
+        paymentMethod: transaction.paymentMethod,
+
+        customerSegment: transaction.customerSegment,
+
+        previousSuccessfulPayments:
+          transaction.customerHistory
+            .previousSuccessfulPayments,
+
+        previousFailedPayments:
+          transaction.customerHistory
+            .previousFailedPayments,
+
+        previousRecoveries:
+          transaction.customerHistory
+            .previousRecoveries,
+      },
+
+      mlPrediction: ml,
+
+      historicalRiskScore: transaction.source === 'historical' ? transaction.riskScore : undefined,
+      historicalRecoverability: transaction.source === 'historical' ? transaction.recoverability : undefined,
+    }
+  }
+
+  const fallbackAction = getFallbackAction(transaction)
 
   return {
     transactionId: transaction.id,
@@ -247,17 +214,19 @@ export function diagnoseTransaction(txnId) {
 
     rootCause: getRootCause(transaction),
 
-    confidence: calculateConfidence(transaction),
+    confidence: 70,
 
-    urgency: getUrgency(transaction),
+    urgency: getUrgency(transaction.riskScore, transaction.amount),
 
-    recommendedAction,
+    recommendedAction: fallbackAction,
 
     alternatePayments:
       getAlternatePayments(transaction),
 
     estimatedRecovery:
-      calculateEstimatedRecovery(transaction),
+      transaction.groundTruthRecoverable
+        ? Math.round(transaction.amount * (transaction.recoverability / 100))
+        : 0,
 
     riskScore: transaction.riskScore,
 
@@ -284,5 +253,59 @@ export function diagnoseTransaction(txnId) {
         transaction.customerHistory
           .previousRecoveries,
     },
+
+    mlPrediction: ml,
   }
+}
+
+function getFallbackAction(transaction) {
+  const {
+    type,
+    failureReason,
+    amount,
+    recoverability,
+  } = transaction
+
+  if (recoverability < 30) {
+    return 'No Action'
+  }
+
+  if (
+    failureReason === 'Expired Card' ||
+    failureReason === 'Payment Method Expired'
+  ) {
+    return 'Card Update Request'
+  }
+
+  if (
+    failureReason === 'Insufficient Funds' ||
+    failureReason === 'Bank Server Timeout' ||
+    failureReason === 'Network Error'
+  ) {
+    return 'Smart Retry'
+  }
+
+  if (
+    type === 'Abandoned Checkout' &&
+    recoverability >= 60
+  ) {
+    return 'Payment Link'
+  }
+
+  if (
+    type === 'Subscription Failure' &&
+    recoverability >= 60
+  ) {
+    return 'UPI Fallback'
+  }
+
+  if (failureReason === 'Card Declined') {
+    return 'UPI Fallback'
+  }
+
+  if (amount <= 25000 && recoverability >= 50) {
+    return 'Payment Link'
+  }
+
+  return 'Human Escalation'
 }

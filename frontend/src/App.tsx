@@ -9,11 +9,14 @@ import {
   type AuditLog, type AuditGuardrail, type AnalyticsSummary,
   type DashboardData, type Merchant, type RecoveryDecision, type GuardrailCheckResult, type SimulationResult,
   type EvaluationData, type IntegrationStatus, type SyncResult, type EvaluateResponse,
+  type AgentRun, type AgentStats,
   fetchTransactions, fetchTransaction, fetchLeakage, fetchDiagnosis, fetchRecoveryActions,
   fetchRecoveryDecision, fetchGuardrailCheck, simulateRecovery,
   fetchAgentLogs, fetchAuditTrail, fetchAuditGuardrails, fetchAnalytics,
   fetchDashboard, fetchMerchants, executeRecovery, fetchEvaluation,
-  fetchIntegrationStatus, syncRazorpayTransactions, evaluateTransaction
+  fetchIntegrationStatus, syncRazorpayTransactions, evaluateTransaction,
+  fetchMLMetrics, fetchAgentRuns, fetchAgentRunForTxn, triggerAgentRecovery,
+  fetchAgentStats, approveAgentRun, rejectAgentRun
 } from "./api";
 
 
@@ -269,10 +272,14 @@ function useApiData<T>(fetcher: () => Promise<T>, deps: unknown[] = []) {
 function DashboardView({ onNavigate, dateRange }: { onNavigate: (n: NavItem) => void; dateRange: string }) {
   const dashboard = useApiData(fetchDashboard);
   const leakage = useApiData(fetchLeakage);
+  const agentStatsRes = useApiData(fetchAgentStats);
+  const agentRunsRes = useApiData(fetchAgentRuns);
   const dashboardData = dashboard.data?.data;
   const allLeakageTxns = leakage.data?.data || [];
   const leakageTxns = filterByDateRange(allLeakageTxns, Number(dateRange));
   const leakageSummary = leakage.data?.summary;
+  const agentStats = agentStatsRes.data?.data;
+  const agentRuns = agentRunsRes.data?.data || [];
 
   if (dashboard.loading || leakage.loading) return <LoadingSpinner />;
   if (dashboard.error || leakage.error) return <ErrorMessage message={dashboard.error || leakage.error || ''} onRetry={() => { dashboard.retry(); leakage.retry(); }} />;
@@ -452,6 +459,60 @@ function DashboardView({ onNavigate, dateRange }: { onNavigate: (n: NavItem) => 
           </tbody>
         </table>
       </Card>
+
+      {agentStats && agentStats.total > 0 && (
+        <>
+          <div className="grid grid-cols-5 gap-4">
+            <StatCard label="Agent Runs" value={String(agentStats.total)} sub="Total autonomous runs" />
+            <StatCard label="Completed" value={String(agentStats.completed)} sub="Successfully finished" accent />
+            <StatCard label="Running" value={String(agentStats.running)} sub="In progress" />
+            <StatCard label="Awaiting Approval" value={String(agentStats.humanApproval)} sub="Needs review" />
+            <StatCard label="Failed/Blocked" value={String(agentStats.failed + agentStats.blocked + agentStats.executionFailed)} sub="Requires attention" />
+          </div>
+
+          <Card className="p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="text-sm font-semibold font-display text-white">Recent Agent Activity</p>
+                <p className="text-xs text-gray-500">Autonomous recovery pipeline runs</p>
+              </div>
+              <span onClick={() => onNavigate("agent")} className="text-[10px] text-[#3B82F6] cursor-pointer hover:text-blue-300">View all →</span>
+            </div>
+            <div className="space-y-2">
+              {agentRuns.slice(0, 5).map((run) => {
+                const execResult = run.stages?.execute?.result;
+                const policyResult = run.stages?.policy?.result;
+                return (
+                  <div key={run.agentRunId} className="flex items-center gap-3 p-3 bg-[#090E1A] rounded-lg border border-[#1E2D45]">
+                    <span className="text-[10px] text-gray-600 font-mono w-16">{run.startedAt ? new Date(run.startedAt).toLocaleTimeString() : ''}</span>
+                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                      run.status === 'COMPLETED' ? 'bg-emerald-400' :
+                      run.status === 'RUNNING' ? 'bg-[#3B82F6] animate-pulse' :
+                      run.status === 'BLOCKED' ? 'bg-amber-400' :
+                      'bg-red-400'
+                    }`} />
+                    <span className="text-[11px] text-gray-300 font-mono flex-shrink-0">{run.transactionId}</span>
+                    <span className="text-[10px] text-[#A78BFA] flex-shrink-0">{(run.stages?.decide?.result as any)?.aiRecommendation || '-'}</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded flex-shrink-0 ${
+                      policyResult?.passed ? 'text-emerald-400 bg-emerald-500/10' : 'text-amber-400 bg-amber-500/10'
+                    }`}>
+                      {policyResult?.passed ? 'APPROVED' : 'BLOCKED'}
+                    </span>
+                    <span className="text-[10px] text-gray-500 flex-shrink-0">{execResult?.status || '-'}</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium border ml-auto ${
+                      run.status === 'COMPLETED' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' :
+                      run.status === 'RUNNING' ? 'text-[#3B82F6] bg-[#2563EB]/10 border-[#2563EB]/30' :
+                      'text-amber-400 bg-amber-500/10 border-amber-500/30'
+                    }`}>
+                      {run.status.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        </>
+      )}
     </div>
   );
 }
@@ -616,6 +677,7 @@ function RecoveryPipeline({ txnId, recoverable, onComplete }: { txnId: string; r
   ]);
   const [running, setRunning] = useState(false);
   const [done, setDone] = useState(false);
+  const [agentRun, setAgentRun] = useState<AgentRun | null>(null);
 
   useEffect(() => {
     setStages([
@@ -627,6 +689,7 @@ function RecoveryPipeline({ txnId, recoverable, onComplete }: { txnId: string; r
     ]);
     setRunning(false);
     setDone(false);
+    setAgentRun(null);
   }, [txnId]);
 
   const updateStage = (id: string, patch: Partial<PipelineStage>) => {
@@ -637,6 +700,7 @@ function RecoveryPipeline({ txnId, recoverable, onComplete }: { txnId: string; r
     const currentTxnId = txnId;
     setRunning(true);
     setDone(false);
+    setAgentRun(null);
     setStages([
       { id: "diagnose", label: "Diagnose", status: "pending" },
       { id: "decide", label: "Decide", status: "pending" },
@@ -646,51 +710,28 @@ function RecoveryPipeline({ txnId, recoverable, onComplete }: { txnId: string; r
     ]);
 
     try {
-      // Stage 1: Diagnose
-      updateStage("diagnose", { status: "running" });
-      const diagRes = await fetchDiagnosis(currentTxnId);
-      updateStage("diagnose", { status: "completed", result: diagRes.data });
+      const result = await triggerAgentRecovery(currentTxnId);
+      const run = result.data;
+      setAgentRun(run);
 
-      // Stage 2: Decide
-      updateStage("decide", { status: "running" });
-      const decRes = await fetchRecoveryDecision(currentTxnId);
-      const decision = decRes.data;
-      updateStage("decide", { status: "completed", result: decision });
+      const stageMap: Record<string, string> = {
+        detect: 'diagnose',
+        diagnose: 'diagnose',
+        decide: 'decide',
+        policy: 'policy',
+        execute: 'execute',
+        recover: 'recover',
+        audit: 'recover',
+      };
 
-      // Stage 3: Policy Check
-      updateStage("policy", { status: "running" });
-      const guardRes = await fetchGuardrailCheck(currentTxnId, decision.action);
-      const guard = guardRes.data;
-      updateStage("policy", { status: "completed", result: guard });
-
-      if (!guard.passed) {
-        updateStage("policy", { status: "blocked", result: guard, error: `Blocked: ${guard.failedGuardrails.map((f) => f.reason).join(", ")}` });
-        setRunning(false);
-        return;
-      }
-
-      if (guard.requiresApproval) {
-        updateStage("execute", { status: "blocked", error: "Requires approval — manual action needed" });
-        setRunning(false);
-        return;
-      }
-
-      // Stage 4: Execute
-      updateStage("execute", { status: "running" });
-      const execRes = await executeRecovery(currentTxnId);
-      const exec = execRes.data;
-      updateStage("execute", { status: "completed", result: exec });
-
-      if (!exec.executed) {
-        updateStage("recover", { status: "failed", error: exec.reason || "Execution failed" });
-        setRunning(false);
-        return;
-      }
-
-      // Stage 5: Recover (simulate outcome)
-      updateStage("recover", { status: "running" });
-      const simRes = await simulateRecovery(currentTxnId);
-      updateStage("recover", { status: "completed", result: simRes.data });
+      if (run.stages?.diagnose?.status === 'COMPLETED') updateStage('diagnose', { status: 'completed', result: run.stages.diagnose.result });
+      if (run.stages?.decide?.status === 'COMPLETED') updateStage('decide', { status: 'completed', result: run.stages.decide.result });
+      if (run.stages?.policy?.status === 'COMPLETED') updateStage('policy', { status: 'completed', result: run.stages.policy.result });
+      else if (run.stages?.policy?.status === 'BLOCKED') updateStage('policy', { status: 'blocked', result: run.stages.policy.result, error: 'Blocked by guardrails' });
+      else if (run.stages?.policy?.status === 'APPROVAL_REQUIRED') updateStage('policy', { status: 'blocked', result: run.stages.policy.result, error: 'Requires approval' });
+      if (run.stages?.execute?.status === 'COMPLETED') updateStage('execute', { status: 'completed', result: run.stages.execute.result });
+      else if (run.stages?.execute?.status === 'FAILED') updateStage('execute', { status: 'failed', result: run.stages.execute.result, error: 'Execution failed' });
+      if (run.stages?.recover?.status === 'COMPLETED') updateStage('recover', { status: 'completed', result: run.stages.recover.result });
 
       setDone(true);
       onComplete?.();
@@ -1100,58 +1141,76 @@ function ActionsView() {
 }
 
 function AgentView() {
-  const { data: logsData, loading: logsLoading, error: logsError, retry: logsRetry } = useApiData(fetchAgentLogs);
-  const { data: analyticsDataRes } = useApiData(fetchAnalytics);
-  const logs = logsData?.data || [];
-  const analytics = analyticsDataRes?.data;
+  const { data: runsData, loading: runsLoading, error: runsError, retry: runsRetry } = useApiData(fetchAgentRuns);
+  const { data: statsData } = useApiData(fetchAgentStats);
+  const runs = runsData?.data || [];
+  const stats = statsData?.data;
 
-  const steps = [
-    { id: "detect", label: "Detect", desc: "Signal ingestion", color: "text-blue-400", bg: "bg-blue-500/20 border-blue-500/30" },
-    { id: "diagnose", label: "Diagnose", desc: "Root cause AI", color: "text-purple-400", bg: "bg-purple-500/20 border-purple-500/30" },
-    { id: "decide", label: "Decide", desc: "Strategy select", color: "text-amber-400", bg: "bg-amber-500/20 border-amber-500/30" },
-    { id: "policy", label: "Policy Check", desc: "Guardrail verify", color: "text-cyan-400", bg: "bg-cyan-500/20 border-cyan-500/30" },
-    { id: "execute", label: "Execute", desc: "Action dispatch", color: "text-emerald-400", bg: "bg-emerald-500/20 border-emerald-500/30" },
-    { id: "recover", label: "Recover", desc: "Payment capture", color: "text-green-400", bg: "bg-green-500/20 border-green-500/30" },
-    { id: "verify", label: "Verify", desc: "Outcome confirm", color: "text-teal-400", bg: "bg-teal-500/20 border-teal-500/30" },
+  const [selectedRun, setSelectedRun] = useState<AgentRun | null>(null);
+
+  const stageConfig = [
+    { key: 'detect', label: 'Detect', icon: '🔍' },
+    { key: 'diagnose', label: 'Diagnose', icon: '🧠' },
+    { key: 'decide', label: 'Decide', icon: '⚡' },
+    { key: 'policy', label: 'Policy', icon: '🛡️' },
+    { key: 'execute', label: 'Execute', icon: '🚀' },
+    { key: 'recover', label: 'Recover', icon: '💰' },
+    { key: 'audit', label: 'Audit', icon: '📋' },
   ];
 
-  const stageColors: Record<string, string> = {
-    Detect: "text-blue-400", Diagnose: "text-purple-400", Decide: "text-amber-400",
-    Policy: "text-cyan-400", Execute: "text-emerald-400", Verify: "text-teal-400",
+  const statusColor = (status: string) => {
+    switch (status) {
+      case 'COMPLETED': return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30';
+      case 'RUNNING': return 'text-[#3B82F6] bg-[#2563EB]/10 border-[#2563EB]/30';
+      case 'BLOCKED': return 'text-amber-400 bg-amber-500/10 border-amber-500/30';
+      case 'HUMAN_APPROVAL_REQUIRED': return 'text-amber-400 bg-amber-500/10 border-amber-500/30';
+      case 'EXECUTION_FAILED': return 'text-red-400 bg-red-500/10 border-red-500/30';
+      case 'FAILED': return 'text-red-400 bg-red-500/10 border-red-500/30';
+      case 'REJECTED': return 'text-gray-400 bg-gray-500/10 border-gray-500/30';
+      default: return 'text-gray-400 bg-gray-500/10 border-gray-500/30';
+    }
   };
 
-  if (logsLoading) return <LoadingSpinner />;
-  if (logsError) return <ErrorMessage message={logsError} onRetry={logsRetry} />;
+  const stageStatusIcon = (status: string) => {
+    switch (status) {
+      case 'COMPLETED': return <span className="text-emerald-400">&#10003;</span>;
+      case 'RUNNING': return <span className="w-3 h-3 border-2 border-[#3B82F6] border-t-transparent rounded-full animate-spin inline-block" />;
+      case 'BLOCKED': case 'APPROVAL_REQUIRED': return <span className="text-amber-400">&#9888;</span>;
+      case 'FAILED': return <span className="text-red-400">&#10007;</span>;
+      case 'NOT_SUPPORTED': case 'SKIPPED': return <span className="text-gray-500">-</span>;
+      case 'PENDING': return <span className="w-2 h-2 rounded-full bg-gray-600 inline-block" />;
+      default: return <span className="w-2 h-2 rounded-full bg-gray-600 inline-block" />;
+    }
+  };
+
+  if (runsLoading) return <LoadingSpinner />;
+  if (runsError) return <ErrorMessage message={runsError} onRetry={runsRetry} />;
 
   return (
     <div className="space-y-4 animate-fade-in">
       <Card className="p-5">
         <div className="flex items-center justify-between mb-5">
           <div>
-            <p className="text-sm font-semibold font-display text-white">Agent Workflow</p>
-            <p className="text-xs text-gray-500">Automated recovery pipeline · 7 stages</p>
+            <p className="text-sm font-semibold font-display text-white">Autonomous Recovery Agent</p>
+            <p className="text-xs text-gray-500">Detect → Diagnose → Decide → Policy → Execute → Recover → Audit</p>
           </div>
           <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-lg">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse-dot" />
-            <span className="text-xs text-emerald-400 font-mono font-medium">Running</span>
+            <span className="text-xs text-emerald-400 font-mono font-medium">Active</span>
           </div>
         </div>
         <div className="flex items-start gap-0">
-          {steps.map((step, i) => (
-            <div key={step.id} className="flex items-center flex-1">
+          {stageConfig.map((step, i) => (
+            <div key={step.key} className="flex items-center flex-1">
               <div className="flex flex-col items-center flex-1">
-                <div className={`w-full border rounded-xl px-3 py-3 text-center ${step.bg} border-current/30 relative`}>
-                  <p className={`text-xs font-bold font-display ${step.color}`}>{step.label}</p>
-                  <p className="text-[9px] text-gray-500 mt-0.5">{step.desc}</p>
-                  {i < 3 && (
-                    <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full animate-pulse-dot border-2 border-[#111827]" />
-                  )}
+                <div className="w-full border rounded-xl px-3 py-3 text-center bg-[#1A2332] border-[#1E2D45]">
+                  <p className="text-lg mb-0.5">{step.icon}</p>
+                  <p className="text-[11px] font-bold font-display text-gray-300">{step.label}</p>
                 </div>
               </div>
-              {i < steps.length - 1 && (
-                <div className="w-4 flex-shrink-0 flex items-center justify-center mt-[-8px]">
+              {i < stageConfig.length - 1 && (
+                <div className="w-3 flex-shrink-0 flex items-center justify-center">
                   <div className="w-full h-px bg-[#1E2D45]" />
-                  <span className="absolute text-[#1E2D45] text-xs">›</span>
                 </div>
               )}
             </div>
@@ -1159,36 +1218,161 @@ function AgentView() {
         </div>
       </Card>
 
-      <div className="grid grid-cols-3 gap-4">
-        <StatCard label="Processed Today" value={String(analytics?.successfulInterventions || logs.length)} sub="Transactions analyzed" />
-        <StatCard label="Actions Dispatched" value={String(analytics?.successfulInterventions || 0)} sub="Across all channels" accent />
-        <StatCard label="Avg Decision Time" value="1.3s" sub="Per transaction" />
-      </div>
+      {stats && (
+        <div className="grid grid-cols-4 gap-4">
+          <StatCard label="Total Runs" value={String(stats.total)} sub="All agent runs" />
+          <StatCard label="Completed" value={String(stats.completed)} sub="Successfully finished" accent />
+          <StatCard label="Awaiting Approval" value={String(stats.humanApproval)} sub="Needs human review" />
+          <StatCard label="Failed / Blocked" value={String(stats.failed + stats.blocked + stats.executionFailed)} sub="Requires attention" />
+        </div>
+      )}
 
       <Card className="p-5">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <p className="text-sm font-semibold font-display text-white">Live Agent Logs</p>
-            <p className="text-xs text-gray-500">Real-time decision stream</p>
-          </div>
-          <div className="flex items-center gap-1.5 bg-blue-500/10 border border-blue-500/20 px-2 py-1 rounded">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse-dot" />
-            <span className="text-[10px] text-blue-400 font-mono">LIVE</span>
+            <p className="text-sm font-semibold font-display text-white">Recent Agent Runs</p>
+            <p className="text-xs text-gray-500">{runs.length} runs recorded</p>
           </div>
         </div>
-        <div className="bg-[#090E1A] rounded-xl border border-[#1E2D45] p-4 space-y-2 max-h-72 overflow-y-auto font-mono">
-          {logs.map((log) => (
-            <div key={log.id} className="flex items-start gap-3 text-[11px] animate-slide-in">
-              <span className="text-gray-600 flex-shrink-0">{log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : ''}</span>
-              <span className={`flex-shrink-0 font-bold w-16 ${stageColors[log.stage] || "text-gray-400"}`}>[{log.stage?.toUpperCase()}]</span>
-              <span className="text-gray-300">{log.message}</span>
-            </div>
-          ))}
-          <div className="flex items-center gap-1">
-            <span className="w-2 h-4 bg-[#2563EB] animate-pulse-dot inline-block rounded-sm" />
+        {runs.length === 0 ? (
+          <div className="p-8 text-center">
+            <p className="text-sm text-gray-500">No agent runs yet.</p>
+            <p className="text-xs text-gray-600 mt-1">Submit a new transaction to trigger autonomous recovery.</p>
           </div>
-        </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="text-[10px] text-gray-500 uppercase tracking-wider border-b border-[#1E2D45]">
+                  <th className="text-left pb-2.5">Run ID</th>
+                  <th className="text-left pb-2.5">Transaction</th>
+                  <th className="text-left pb-2.5">Source</th>
+                  <th className="text-left pb-2.5">Stage</th>
+                  <th className="text-left pb-2.5">AI Action</th>
+                  <th className="text-left pb-2.5">Policy</th>
+                  <th className="text-left pb-2.5">Execution</th>
+                  <th className="text-left pb-2.5">Status</th>
+                  <th className="text-left pb-2.5">Time</th>
+                  <th className="text-left pb-2.5"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {runs.map((run) => {
+                  const policyResult = run.stages?.policy?.result;
+                  const execResult = run.stages?.execute?.result;
+                  const decideResult = run.stages?.decide?.result;
+                  return (
+                    <tr key={run.agentRunId} className="table-row-hover border-b border-[#1E2D45]/40 cursor-pointer" onClick={() => setSelectedRun(selectedRun?.agentRunId === run.agentRunId ? null : run)}>
+                      <td className="py-3 text-[11px] font-mono text-gray-400">{run.agentRunId.slice(0, 20)}...</td>
+                      <td className="py-3 text-[11px] font-mono text-gray-300">{run.transactionId}</td>
+                      <td className="py-3 text-[10px] text-gray-400">{run.source}</td>
+                      <td className="py-3 text-[10px] text-gray-400">{run.currentStage}</td>
+                      <td className="py-3 text-[10px] text-[#A78BFA]">{(decideResult as any)?.aiRecommendation || '-'}</td>
+                      <td className="py-3">
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${policyResult?.passed === true ? 'text-emerald-400 bg-emerald-500/10' : policyResult?.passed === false ? 'text-amber-400 bg-amber-500/10' : 'text-gray-500'}`}>
+                          {policyResult?.passed === true ? 'APPROVED' : policyResult?.passed === false ? 'BLOCKED' : '-'}
+                        </span>
+                      </td>
+                      <td className="py-3">
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${execResult?.executed ? 'text-emerald-400 bg-emerald-500/10' : execResult?.status === 'NOT_SUPPORTED' ? 'text-gray-500 bg-gray-500/10' : execResult?.status ? 'text-amber-400 bg-amber-500/10' : 'text-gray-500'}`}>
+                          {execResult?.status || '-'}
+                        </span>
+                      </td>
+                      <td className="py-3">
+                        <span className={`text-[10px] px-2 py-0.5 rounded font-medium border ${statusColor(run.status)}`}>
+                          {run.status.replace(/_/g, ' ')}
+                        </span>
+                      </td>
+                      <td className="py-3 text-[10px] text-gray-500">{run.startedAt ? new Date(run.startedAt).toLocaleTimeString() : ''}</td>
+                      <td className="py-3 text-[10px] text-gray-500">{selectedRun?.agentRunId === run.agentRunId ? '▲' : '▼'}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
+
+      {selectedRun && (
+        <Card className="p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="text-sm font-semibold font-display text-white">Pipeline Detail</p>
+              <p className="text-[10px] text-gray-500 font-mono">{selectedRun.agentRunId} — {selectedRun.transactionId}</p>
+            </div>
+            {selectedRun.status === 'HUMAN_APPROVAL_REQUIRED' && (
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => { await approveAgentRun(selectedRun.agentRunId); runsRetry?.(); }}
+                  className="px-3 py-1.5 bg-emerald-500/20 text-emerald-400 text-[11px] font-medium rounded-lg border border-emerald-500/30 hover:bg-emerald-500/30"
+                >
+                  Approve
+                </button>
+                <button
+                  onClick={async () => { await rejectAgentRun(selectedRun.agentRunId); runsRetry?.(); }}
+                  className="px-3 py-1.5 bg-red-500/20 text-red-400 text-[11px] font-medium rounded-lg border border-red-500/30 hover:bg-red-500/30"
+                >
+                  Reject
+                </button>
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-2 mb-4">
+            {stageConfig.map((step, i) => {
+              const stage = selectedRun.stages?.[step.key as keyof typeof selectedRun.stages];
+              const stageStatus = stage?.status || 'PENDING';
+              return (
+                <div key={step.key} className="flex items-center flex-1">
+                  <div className={`flex-1 border rounded-lg px-2 py-2 text-center ${
+                    stageStatus === 'COMPLETED' ? 'border-emerald-500/40 bg-emerald-500/10' :
+                    stageStatus === 'RUNNING' ? 'border-[#3B82F6]/40 bg-[#2563EB]/10' :
+                    stageStatus === 'BLOCKED' || stageStatus === 'APPROVAL_REQUIRED' ? 'border-amber-500/40 bg-amber-500/10' :
+                    stageStatus === 'FAILED' ? 'border-red-500/40 bg-red-500/10' :
+                    'border-[#1E2D45] bg-[#1A2332]'
+                  }`}>
+                    <div className="flex items-center justify-center gap-1">
+                      {stageStatusIcon(stageStatus)}
+                      <span className={`text-[10px] font-semibold ${stageStatus === 'COMPLETED' ? 'text-emerald-400' : stageStatus === 'RUNNING' ? 'text-[#3B82F6]' : stageStatus === 'BLOCKED' || stageStatus === 'APPROVAL_REQUIRED' ? 'text-amber-400' : stageStatus === 'FAILED' ? 'text-red-400' : 'text-gray-500'}`}>
+                        {step.label}
+                      </span>
+                    </div>
+                  </div>
+                  {i < stageConfig.length - 1 && (
+                    <div className="w-2 flex-shrink-0 flex items-center justify-center">
+                      <div className="w-full h-px bg-[#1E2D45]" />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="space-y-2">
+            {stageConfig.map(step => {
+              const stage = selectedRun.stages?.[step.key as keyof typeof selectedRun.stages];
+              if (!stage || (!stage.result && !stage.error)) return null;
+              return (
+                <details key={step.key} className="group">
+                  <summary className="cursor-pointer text-[11px] text-gray-400 hover:text-gray-200 flex items-center gap-2">
+                    <span className="group-open:rotate-90 transition-transform text-[10px]">&#9654;</span>
+                    {step.label}
+                    <span className={`text-[9px] font-mono ${stage.status === 'COMPLETED' ? 'text-emerald-400' : stage.status === 'BLOCKED' || stage.status === 'APPROVAL_REQUIRED' ? 'text-amber-400' : stage.status === 'FAILED' ? 'text-red-400' : 'text-gray-500'}`}>
+                      {stage.status}
+                    </span>
+                  </summary>
+                  {stage.error && <p className="text-[10px] text-red-400 mt-1">{stage.error}</p>}
+                  {stage.result && (
+                    <pre className="mt-2 p-3 bg-[#090E1A] rounded-lg border border-[#1E2D45] text-[10px] text-gray-400 overflow-x-auto max-h-48 overflow-y-auto">
+                      {JSON.stringify(stage.result, null, 2)}
+                    </pre>
+                  )}
+                </details>
+              );
+            })}
+          </div>
+        </Card>
+      )}
     </div>
   );
 }
@@ -1383,6 +1567,8 @@ function AnalyticsView({ dateRange }: { dateRange: string }) {
   const txns = filterByDateRange(txnData?.data || [], Number(dateRange));
   const { data: evalData, loading: evalLoading } = useApiData(fetchEvaluation);
   const evaluation = evalData?.data;
+  const { data: mlData, loading: mlLoading } = useApiData(fetchMLMetrics);
+  const mlMetrics = mlData?.data;
 
   const dayOrder = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -1586,6 +1772,66 @@ function AnalyticsView({ dateRange }: { dateRange: string }) {
           </Card>
         </>
       ) : null}
+
+      {mlMetrics?.loaded && (
+        <>
+          <p className="text-[10px] text-gray-500 uppercase tracking-wider font-mono font-semibold">ML Model Performance</p>
+          <div className="grid grid-cols-3 gap-4">
+            <StatCard label="Recoverability Accuracy" value={`${mlMetrics.recoverability?.accuracy ? (mlMetrics.recoverability.accuracy * 100).toFixed(1) : 0}%`} sub={`F1: ${mlMetrics.recoverability?.f1Score ? (mlMetrics.recoverability.f1Score * 100).toFixed(1) : 0}%`} />
+            <StatCard label="Risk Score MAE" value={mlMetrics.riskScore?.mae?.toFixed(2) || '0'} sub={`R²: ${mlMetrics.riskScore?.r2Score?.toFixed(3) || '0'}`} accent />
+            <StatCard label="Action Accuracy" value={`${mlMetrics.action?.accuracy ? (mlMetrics.action.accuracy * 100).toFixed(1) : 0}%`} sub={`Macro F1: ${mlMetrics.action?.macroF1 ? (mlMetrics.action.macroF1 * 100).toFixed(1) : 0}%`} />
+          </div>
+
+          <Card className="p-5">
+            <p className="text-sm font-semibold font-display text-white mb-4">ML Action Classification (Per-Class)</p>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="text-[10px] text-gray-500 uppercase tracking-wider border-b border-[#1E2D45]">
+                    <th className="text-left pb-2.5">Action</th>
+                    <th className="text-right pb-2.5">Precision</th>
+                    <th className="text-right pb-2.5">Recall</th>
+                    <th className="text-right pb-2.5">F1 Score</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {mlMetrics.action?.perClass && Object.entries(mlMetrics.action.perClass).map(([action, metrics]) => (
+                    <tr key={action} className="table-row-hover border-b border-[#1E2D45]/40">
+                      <td className="py-3 text-xs text-gray-200 font-medium">{action}</td>
+                      <td className="py-3 text-right font-mono text-[11px] text-gray-400">{(metrics.precision * 100).toFixed(1)}%</td>
+                      <td className="py-3 text-right font-mono text-[11px] text-gray-400">{(metrics.recall * 100).toFixed(1)}%</td>
+                      <td className="py-3 text-right font-mono text-[11px] text-gray-400">{(metrics.f1Score * 100).toFixed(1)}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+
+          <Card className="p-5">
+            <p className="text-sm font-semibold font-display text-white mb-4">Feature Importance (Recoverability Model)</p>
+            <div className="space-y-2">
+              {mlMetrics.recoverability?.featureImportances && Object.entries(mlMetrics.recoverability.featureImportances)
+                .sort(([, a], [, b]) => b - a)
+                .slice(0, 8)
+                .map(([feature, importance]) => (
+                  <div key={feature}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-gray-300">{feature}</span>
+                      <span className="font-mono text-[11px] text-gray-400">{(importance * 100).toFixed(1)}%</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-[#1E2D45] rounded-full">
+                      <div
+                        className="h-full rounded-full bg-[#2563EB]"
+                        style={{ width: `${importance * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </Card>
+        </>
+      )}
     </div>
   );
 }
@@ -1605,8 +1851,35 @@ function IntegrationView() {
   const [evaluating, setEvaluating] = useState(false);
   const [evalResult, setEvalResult] = useState<EvaluateResponse | null>(null);
   const [evalError, setEvalError] = useState<string | null>(null);
+  const [agentRun, setAgentRun] = useState<AgentRun | null>(null);
+  const [agentPolling, setAgentPolling] = useState(false);
 
   const status = statusData as IntegrationStatus | null;
+
+  const pollAgentRun = async (txnId: string) => {
+    setAgentPolling(true);
+    let attempts = 0;
+    const maxAttempts = 20;
+    const interval = 500;
+
+    while (attempts < maxAttempts) {
+      try {
+        const result = await fetchAgentRunForTxn(txnId);
+        if (result.data) {
+          setAgentRun(result.data);
+          if (['COMPLETED', 'BLOCKED', 'HUMAN_APPROVAL_REQUIRED', 'EXECUTION_FAILED', 'FAILED', 'REJECTED'].includes(result.data.status)) {
+            setAgentPolling(false);
+            return;
+          }
+        }
+      } catch {
+        // Agent run not ready yet
+      }
+      await new Promise(r => setTimeout(r, interval));
+      attempts++;
+    }
+    setAgentPolling(false);
+  };
 
   const handleSync = async () => {
     setSyncing(true);
@@ -1627,6 +1900,7 @@ function IntegrationView() {
     setEvaluating(true);
     setEvalError(null);
     setEvalResult(null);
+    setAgentRun(null);
     try {
       const result = await evaluateTransaction({
         amount: Number(simAmount) || 2199,
@@ -1636,6 +1910,9 @@ function IntegrationView() {
         customerSegment: simSegment,
       });
       setEvalResult(result);
+      if (result.transaction?.id) {
+        pollAgentRun(result.transaction.id);
+      }
     } catch (err) {
       setEvalError(err instanceof Error ? err.message : 'Evaluation failed');
     } finally {
@@ -2009,6 +2286,45 @@ function IntegrationView() {
             </div>
           )}
 
+          {evalResult.diagnosis?.mlPrediction?.mlAvailable && (
+            <div className="bg-[#1A2332] rounded-xl border border-[#7C3AED]/30 p-4 mb-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-5 h-5 rounded bg-[#7C3AED]/20 flex items-center justify-center">
+                  <span className="text-[10px] text-[#A78BFA]">ML</span>
+                </div>
+                <p className="text-[10px] text-gray-500 uppercase tracking-wider">ML Model Prediction</p>
+              </div>
+              <div className="grid grid-cols-3 gap-3 mb-3">
+                <div>
+                  <p className="text-[10px] text-gray-500">Recoverability</p>
+                  <p className={`text-xs font-medium ${evalResult.diagnosis.mlPrediction.recoverability?.prediction === 'recoverable' ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {evalResult.diagnosis.mlPrediction.recoverability?.prediction === 'recoverable' ? 'Recoverable' : 'Not Recoverable'}
+                  </p>
+                  <p className="text-[10px] text-gray-400">{evalResult.diagnosis.mlPrediction.recoverability?.probability ? (evalResult.diagnosis.mlPrediction.recoverability.probability * 100).toFixed(1) : 0}%</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-500">Risk Score (ML)</p>
+                  <p className="text-xs font-medium text-white">{evalResult.diagnosis.mlPrediction.riskScore?.prediction}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-500">ML Action</p>
+                  <p className="text-xs font-medium text-[#A78BFA]">{evalResult.diagnosis.mlPrediction.action?.prediction}</p>
+                  <p className="text-[10px] text-gray-400">{evalResult.diagnosis.mlPrediction.action?.confidence ? (evalResult.diagnosis.mlPrediction.action.confidence * 100).toFixed(1) : 0}% conf</p>
+                </div>
+              </div>
+              {evalResult.diagnosis.mlPrediction.reasoning && evalResult.diagnosis.mlPrediction.reasoning.length > 0 && (
+                <div>
+                  <p className="text-[10px] text-gray-500 mb-1">Reasoning</p>
+                  <div className="space-y-1">
+                    {evalResult.diagnosis.mlPrediction.reasoning.map((r, i) => (
+                      <p key={i} className="text-[10px] text-gray-400">• {r}</p>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-4">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-emerald-400 text-sm">✓</span>
@@ -2022,8 +2338,113 @@ function IntegrationView() {
               <span className="text-emerald-400 text-sm">✓</span>
               <span className="text-xs text-emerald-400 font-medium">Recovery decision completed</span>
             </div>
-            <p className="text-[10px] text-gray-500 mt-2">Status: Awaiting Recovery</p>
+            <p className="text-[10px] text-gray-500 mt-2">Status: Autonomous agent triggered</p>
           </div>
+        </Card>
+      )}
+
+      {agentRun && (
+        <Card className="p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="text-sm font-semibold font-display text-white">Autonomous Agent Pipeline</p>
+              <p className="text-[10px] text-gray-500 font-mono">{agentRun.agentRunId}</p>
+            </div>
+            <span className={`text-[10px] px-2 py-0.5 rounded font-medium border ${
+              agentRun.status === 'COMPLETED' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' :
+              agentRun.status === 'RUNNING' ? 'text-[#3B82F6] bg-[#2563EB]/10 border-[#2563EB]/30' :
+              agentRun.status === 'BLOCKED' ? 'text-amber-400 bg-amber-500/10 border-amber-500/30' :
+              agentRun.status === 'HUMAN_APPROVAL_REQUIRED' ? 'text-amber-400 bg-amber-500/10 border-amber-500/30' :
+              'text-red-400 bg-red-500/10 border-red-500/30'
+            }`}>
+              {agentRun.status.replace(/_/g, ' ')}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 mb-4">
+            {(['detect', 'diagnose', 'decide', 'policy', 'execute', 'recover', 'audit'] as const).map((stage, i) => {
+              const stageData = agentRun.stages?.[stage];
+              const stageStatus = stageData?.status || 'PENDING';
+              return (
+                <div key={stage} className="flex items-center flex-1">
+                  <div className={`flex-1 border rounded-lg px-2 py-2 text-center ${
+                    stageStatus === 'COMPLETED' ? 'border-emerald-500/40 bg-emerald-500/10' :
+                    stageStatus === 'RUNNING' ? 'border-[#3B82F6]/40 bg-[#2563EB]/10' :
+                    stageStatus === 'BLOCKED' || stageStatus === 'APPROVAL_REQUIRED' ? 'border-amber-500/40 bg-amber-500/10' :
+                    stageStatus === 'FAILED' ? 'border-red-500/40 bg-red-500/10' :
+                    'border-[#1E2D45] bg-[#1A2332]'
+                  }`}>
+                    <div className="flex items-center justify-center gap-1">
+                      {stageStatus === 'COMPLETED' ? <span className="text-emerald-400">&#10003;</span> :
+                       stageStatus === 'RUNNING' ? <span className="w-3 h-3 border-2 border-[#3B82F6] border-t-transparent rounded-full animate-spin inline-block" /> :
+                       stageStatus === 'BLOCKED' || stageStatus === 'APPROVAL_REQUIRED' ? <span className="text-amber-400">&#9888;</span> :
+                       stageStatus === 'FAILED' ? <span className="text-red-400">&#10007;</span> :
+                       <span className="w-2 h-2 rounded-full bg-gray-600 inline-block" />}
+                      <span className={`text-[10px] font-semibold capitalize ${stageStatus === 'COMPLETED' ? 'text-emerald-400' : stageStatus === 'RUNNING' ? 'text-[#3B82F6]' : stageStatus === 'FAILED' ? 'text-red-400' : 'text-gray-500'}`}>
+                        {stage}
+                      </span>
+                    </div>
+                  </div>
+                  {i < 6 && <div className="w-2 flex-shrink-0"><div className="w-full h-px bg-[#1E2D45]" /></div>}
+                </div>
+              );
+            })}
+          </div>
+
+          {agentPolling && (
+            <div className="flex items-center gap-2 mb-3 text-[11px] text-[#3B82F6]">
+              <span className="w-3 h-3 border-2 border-[#3B82F6] border-t-transparent rounded-full animate-spin" />
+              Agent pipeline running...
+            </div>
+          )}
+
+          {agentRun.stages?.execute?.result && (
+            <div className="bg-[#1A2332] rounded-lg border border-[#1E2D45] p-3 mb-3">
+              <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Execution Result</p>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <p className="text-[10px] text-gray-500">Action</p>
+                  <p className="text-xs text-white">{(agentRun.stages.execute.result as any)?.action || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-500">Status</p>
+                  <p className={`text-xs ${(agentRun.stages.execute.result as any)?.executed ? 'text-emerald-400' : 'text-amber-400'}`}>
+                    {(agentRun.stages.execute.result as any)?.status || '-'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-500">Provider</p>
+                  <p className="text-xs text-gray-400">{(agentRun.stages.execute.result as any)?.provider || '-'}</p>
+                </div>
+              </div>
+              {(agentRun.stages.execute.result as any)?.shortUrl && (
+                <div className="mt-2">
+                  <p className="text-[10px] text-gray-500">Payment Link</p>
+                  <a href={(agentRun.stages.execute.result as any).shortUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-[#3B82F6] hover:underline break-all">
+                    {(agentRun.stages.execute.result as any).shortUrl}
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
+
+          {agentRun.stages?.policy?.result && (
+            <div className="bg-[#1A2332] rounded-lg border border-[#1E2D45] p-3">
+              <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Policy Check</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-[10px] text-gray-500">Result</p>
+                  <p className={`text-xs ${(agentRun.stages.policy.result as any)?.passed ? 'text-emerald-400' : 'text-amber-400'}`}>
+                    {(agentRun.stages.policy.result as any)?.passed ? 'APPROVED' : 'BLOCKED'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-500">Allowed Action</p>
+                  <p className="text-xs text-white">{(agentRun.stages.policy.result as any)?.allowedAction || '-'}</p>
+                </div>
+              </div>
+            </div>
+          )}
         </Card>
       )}
     </div>

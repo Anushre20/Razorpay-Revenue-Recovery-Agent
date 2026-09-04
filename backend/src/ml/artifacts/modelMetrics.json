@@ -1,0 +1,121 @@
+{
+  "totalTransactions": 5000,
+  "trainSize": 4000,
+  "testSize": 1000,
+  "featureCount": 12,
+  "features": [
+    "amount",
+    "attemptCount",
+    "prevSuccessfulPayments",
+    "prevFailedPayments",
+    "prevRecoveries",
+    "checkoutDuration",
+    "daysOverdue",
+    "type",
+    "paymentMethod",
+    "failureReason",
+    "customerSegment",
+    "deviceType"
+  ],
+  "recoverability": {
+    "accuracy": 0.983,
+    "precision": 0.984,
+    "recall": 0.9912,
+    "f1Score": 0.9876,
+    "featureImportances": {
+      "amount": 0.0107,
+      "attemptCount": 0.2439,
+      "prevSuccessfulPayments": 0.1267,
+      "prevFailedPayments": 0.0955,
+      "prevRecoveries": 0.0435,
+      "checkoutDuration": 0.0745,
+      "daysOverdue": 0.0035,
+      "type": 0.0235,
+      "paymentMethod": 0.0009,
+      "failureReason": 0.3422,
+      "customerSegment": 0.035,
+      "deviceType": 0.0002
+    }
+  },
+  "riskScore": {
+    "mae": 4.0727,
+    "rmse": 5.0681,
+    "r2Score": 0.9104,
+    "featureImportances": {
+      "amount": 0.0052,
+      "attemptCount": 0.3014,
+      "prevSuccessfulPayments": 0.1398,
+      "prevFailedPayments": 0.1139,
+      "prevRecoveries": 0.0426,
+      "checkoutDuration": 0.0531,
+      "daysOverdue": 0.0031,
+      "type": 0.0206,
+      "paymentMethod": 0.002,
+      "failureReason": 0.292,
+      "customerSegment": 0.0245,
+      "deviceType": 0.0017
+    }
+  },
+  "action": {
+    "accuracy": 0.749,
+    "macroPrecision": 0.4931,
+    "macroRecall": 0.4279,
+    "macroF1": 0.4539,
+    "perClass": {
+      "Card Update Request": {
+        "precision": 0.4286,
+        "recall": 0.2885,
+        "f1Score": 0.3448
+      },
+      "Email Reminder": {
+        "precision": 0.1579,
+        "recall": 0.125,
+        "f1Score": 0.1395
+      },
+      "Human Escalation": {
+        "precision": 0.8926,
+        "recall": 0.962,
+        "f1Score": 0.926
+      },
+      "No Action": {
+        "precision": 0.8197,
+        "recall": 0.6494,
+        "f1Score": 0.7246
+      },
+      "Payment Link": {
+        "precision": 0.2581,
+        "recall": 0.254,
+        "f1Score": 0.256
+      },
+      "Smart Retry": {
+        "precision": 0.6765,
+        "recall": 0.4694,
+        "f1Score": 0.5542
+      },
+      "UPI Fallback": {
+        "precision": 0.4333,
+        "recall": 0.3421,
+        "f1Score": 0.3824
+      },
+      "WhatsApp Reminder": {
+        "precision": 0.2785,
+        "recall": 0.3333,
+        "f1Score": 0.3034
+      }
+    },
+    "featureImportances": {
+      "amount": 0.1701,
+      "attemptCount": 0.2369,
+      "prevSuccessfulPayments": 0.0986,
+      "prevFailedPayments": 0.0694,
+      "prevRecoveries": 0.0466,
+      "checkoutDuration": 0.1001,
+      "daysOverdue": 0.019,
+      "type": 0.0239,
+      "paymentMethod": 0.0154,
+      "failureReason": 0.1794,
+      "customerSegment": 0.03,
+      "deviceType": 0.0107
+    }
+  }
+}

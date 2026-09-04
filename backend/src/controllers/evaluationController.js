@@ -1,4 +1,5 @@
 import { computeEvaluation } from '../services/evaluationService.js'
+import { getModelMetrics, isLoaded } from '../services/mlInferenceService.js'
 
 export const getEvaluation = (req, res) => {
   try {
@@ -13,6 +14,29 @@ export const getEvaluation = (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to compute evaluation metrics',
+    })
+  }
+}
+
+export const getMLMetrics = (req, res) => {
+  try {
+    if (!isLoaded()) {
+      return res.json({
+        success: true,
+        data: { loaded: false, message: 'ML models not loaded' },
+      })
+    }
+
+    const metrics = getModelMetrics()
+    res.json({
+      success: true,
+      data: { loaded: true, ...metrics },
+    })
+  } catch (err) {
+    console.error('ML metrics retrieval failed:', err.message)
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve ML metrics',
     })
   }
 }

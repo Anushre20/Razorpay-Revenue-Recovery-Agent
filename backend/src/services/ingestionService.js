@@ -2,6 +2,7 @@ import {
   findTransaction,
   addDemoTransaction,
 } from './transactionStore.js'
+import { predictAll } from './mlInferenceService.js'
 
 let demoCounter = Date.now()
 
@@ -34,29 +35,6 @@ function normalizeDemoInput(input) {
     type = 'Subscription Failure'
   }
 
-  let riskScore = 50
-  if (attemptCount >= 3) riskScore += 15
-  if (amount >= 100000) riskScore += 10
-  if (amount >= 50000) riskScore += 5
-  if (customerSegment === 'High Value') riskScore += 5
-  if (customerSegment === 'New') riskScore += 5
-  riskScore = Math.min(99, Math.max(10, riskScore))
-
-  let recoverability = 50
-  if (failureReason === 'Insufficient Funds' || failureReason === 'Bank Server Timeout' || failureReason === 'Network Error') {
-    recoverability = 75
-  } else if (failureReason === 'Card Declined') {
-    recoverability = 60
-  } else if (failureReason === 'Expired Card' || failureReason === 'Payment Method Expired') {
-    recoverability = 40
-  } else if (failureReason === 'Checkout Abandoned' || failureReason === 'Customer Drop-off') {
-    recoverability = 55
-  } else if (failureReason === '3D Secure Authentication Failed') {
-    recoverability = 65
-  }
-  if (attemptCount >= 3) recoverability -= 10
-  recoverability = Math.min(95, Math.max(15, recoverability))
-
   return {
     id: generateDemoId(),
     merchant: input.merchant || 'Demo Merchant',
@@ -78,10 +56,10 @@ function normalizeDemoInput(input) {
     daysOverdue: input.daysOverdue || 0,
     deviceType: input.deviceType || 'Unknown',
     customerSegment,
-    riskScore,
-    recoverability,
+    riskScore: 50,
+    recoverability: 50,
     groundTruthAction: 'No Action',
-    groundTruthRecoverable: recoverability >= 30,
+    groundTruthRecoverable: false,
     groundTruthRecoveredAmount: 0,
     source: 'demo',
   }

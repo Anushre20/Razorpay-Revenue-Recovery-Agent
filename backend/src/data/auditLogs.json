@@ -1403,5 +1403,615 @@
       "executed": false,
       "reason": "This recovery action does not have a Razorpay execution flow yet"
     }
+  },
+  {
+    "auditId": "AUD-1788530616411-mzq1i",
+    "timestamp": "2026-09-04T14:03:36.411Z",
+    "transactionId": "TXN-2847001",
+    "eventType": "AI_DECISION",
+    "action": "Human Escalation",
+    "status": "DECIDED",
+    "details": {
+      "reason": "Multiple payment attempts require human review",
+      "recoverability": 54,
+      "riskScore": 45,
+      "amount": 139331,
+      "failureReason": "Network Error",
+      "requiresApproval": true
+    }
+  },
+  {
+    "auditId": "AUD-1788532081240-6g2kd",
+    "timestamp": "2026-09-04T14:28:01.240Z",
+    "transactionId": "DEMO-1788525035470",
+    "eventType": "AI_DECISION",
+    "action": "UPI Fallback",
+    "status": "DECIDED",
+    "details": {
+      "reason": "UPI provides an alternative payment method",
+      "recoverability": 60,
+      "riskScore": 55,
+      "amount": 2199,
+      "failureReason": "Card Declined",
+      "requiresApproval": false
+    }
+  },
+  {
+    "auditId": "AUD-1788532684945-vcgq9",
+    "timestamp": "2026-09-04T14:38:04.945Z",
+    "transactionId": "TXN-2847020",
+    "eventType": "AI_DECISION",
+    "action": "Human Escalation",
+    "status": "DECIDED",
+    "details": {
+      "reason": "ML recommended \"WhatsApp Reminder\" but guardrails changed it to \"Human Escalation\": Automatic recovery blocked because transaction amount ₹80871 exceeds the ₹25000 limit.",
+      "recoverability": 100,
+      "riskScore": 33,
+      "amount": 80871,
+      "failureReason": "Price Changed",
+      "requiresApproval": true
+    }
+  },
+  {
+    "auditId": "AUD-1788532711942-pqd3l",
+    "timestamp": "2026-09-04T14:38:31.942Z",
+    "transactionId": "RZP-pay_TXxFe02Pa0Pth3",
+    "eventType": "AI_DECISION",
+    "action": "Human Escalation",
+    "status": "DECIDED",
+    "details": {
+      "reason": "ML recommended \"WhatsApp Reminder\" but guardrails changed it to \"Human Escalation\": Automatic recovery blocked because transaction amount ₹1000000 exceeds the ₹25000 limit.",
+      "recoverability": 31,
+      "riskScore": 42,
+      "amount": 1000000,
+      "failureReason": "",
+      "requiresApproval": true
+    }
+  },
+  {
+    "auditId": "AUD-1788532936885-i5n51",
+    "timestamp": "2026-09-04T14:42:16.885Z",
+    "transactionId": "DEMO-1788532649607",
+    "eventType": "AI_DECISION",
+    "action": "Human Escalation",
+    "status": "DECIDED",
+    "details": {
+      "reason": "ML confidence too low for automated action or guardrail blocked automatic recovery",
+      "recoverability": 3,
+      "riskScore": 57,
+      "amount": 2199,
+      "failureReason": "Card Declined",
+      "requiresApproval": false
+    }
+  },
+  {
+    "auditId": "AUD-1788532950205-ga54m",
+    "timestamp": "2026-09-04T14:42:30.205Z",
+    "transactionId": "TXN-2847020",
+    "eventType": "AI_DECISION",
+    "action": "Human Escalation",
+    "status": "DECIDED",
+    "details": {
+      "reason": "ML recommended \"WhatsApp Reminder\" but guardrails changed it to \"Human Escalation\": Automatic recovery blocked because transaction amount ₹80871 exceeds the ₹25000 limit.",
+      "recoverability": 100,
+      "riskScore": 33,
+      "amount": 80871,
+      "failureReason": "Price Changed",
+      "requiresApproval": true
+    }
+  },
+  {
+    "auditId": "AUD-1788533857087-r9ufh",
+    "timestamp": "2026-09-04T14:57:37.087Z",
+    "transactionId": "DEMO-1788533853175",
+    "eventType": "AI_DECISION",
+    "action": "Email Reminder",
+    "status": "DECIDED",
+    "details": {
+      "reason": "Customer engagement via email to recover payment",
+      "recoverability": 97,
+      "riskScore": 41,
+      "amount": 1500,
+      "failureReason": "Payment failed",
+      "requiresApproval": false
+    }
+  },
+  {
+    "auditId": "AUD-1788533857090-ydgno",
+    "timestamp": "2026-09-04T14:57:37.090Z",
+    "transactionId": "DEMO-1788533853175",
+    "eventType": "POLICY_CHECK",
+    "action": "Email Reminder",
+    "status": "PASSED",
+    "details": {
+      "passed": true,
+      "allowedAction": "Email Reminder",
+      "requiresApproval": false,
+      "failedGuardrails": [],
+      "checks": {
+        "retryLimit": true,
+        "recoveryAmount": true,
+        "recoverability": true
+      },
+      "policy": {
+        "maxRetryAttempts": 3,
+        "maxAutomaticRecoveryAmount": 25000,
+        "minimumRecoverability": 30
+      }
+    }
+  },
+  {
+    "auditId": "AUD-1788534052289-6lsmb",
+    "timestamp": "2026-09-04T15:00:52.289Z",
+    "transactionId": "DEMO-1788534048382",
+    "eventType": "AI_DECISION",
+    "action": "Email Reminder",
+    "status": "DECIDED",
+    "details": {
+      "reason": "Customer engagement via email to recover payment",
+      "recoverability": 97,
+      "riskScore": 41,
+      "amount": 1500,
+      "failureReason": "Payment failed",
+      "requiresApproval": false
+    }
+  },
+  {
+    "auditId": "AUD-1788534052291-rzv6w",
+    "timestamp": "2026-09-04T15:00:52.291Z",
+    "transactionId": "DEMO-1788534048382",
+    "eventType": "POLICY_CHECK",
+    "action": "Email Reminder",
+    "status": "PASSED",
+    "details": {
+      "passed": true,
+      "allowedAction": "Email Reminder",
+      "requiresApproval": false,
+      "failedGuardrails": [],
+      "checks": {
+        "retryLimit": true,
+        "recoveryAmount": true,
+        "recoverability": true
+      },
+      "policy": {
+        "maxRetryAttempts": 3,
+        "maxAutomaticRecoveryAmount": 25000,
+        "minimumRecoverability": 30
+      }
+    }
+  },
+  {
+    "auditId": "AUD-1788534062474-5xqsh",
+    "timestamp": "2026-09-04T15:01:02.474Z",
+    "transactionId": "DEMO-1788534048383",
+    "eventType": "AI_DECISION",
+    "action": "UPI Fallback",
+    "status": "DECIDED",
+    "details": {
+      "reason": "ML recommended \"UPI Fallback\" but guardrails changed it to \"Human Escalation\": Automatic recovery blocked because transaction amount ₹50000 exceeds the ₹25000 limit.",
+      "recoverability": 97,
+      "riskScore": 41,
+      "amount": 50000,
+      "failureReason": "Card declined",
+      "requiresApproval": true
+    }
+  },
+  {
+    "auditId": "AUD-1788534062475-sz9le",
+    "timestamp": "2026-09-04T15:01:02.475Z",
+    "transactionId": "DEMO-1788534048383",
+    "eventType": "POLICY_CHECK",
+    "action": "UPI Fallback",
+    "status": "BLOCKED",
+    "details": {
+      "passed": false,
+      "allowedAction": "Human Escalation",
+      "requiresApproval": true,
+      "failedGuardrails": [
+        {
+          "passed": false,
+          "guardrail": "Automatic Recovery Amount",
+          "reason": "Automatic recovery blocked because transaction amount ₹50000 exceeds the ₹25000 limit."
+        }
+      ],
+      "checks": {
+        "retryLimit": true,
+        "recoveryAmount": false,
+        "recoverability": true
+      },
+      "policy": {
+        "maxRetryAttempts": 3,
+        "maxAutomaticRecoveryAmount": 25000,
+        "minimumRecoverability": 30
+      }
+    }
+  },
+  {
+    "auditId": "AUD-1788534088772-9n8s0",
+    "timestamp": "2026-09-04T15:01:28.772Z",
+    "transactionId": "DEMO-1788534048384",
+    "eventType": "AI_DECISION",
+    "action": "Email Reminder",
+    "status": "DECIDED",
+    "details": {
+      "reason": "Customer engagement via email to recover payment",
+      "recoverability": 88,
+      "riskScore": 41,
+      "amount": 5000,
+      "failureReason": "Fraud suspected",
+      "requiresApproval": false
+    }
+  },
+  {
+    "auditId": "AUD-1788534088774-qkcx7",
+    "timestamp": "2026-09-04T15:01:28.774Z",
+    "transactionId": "DEMO-1788534048384",
+    "eventType": "POLICY_CHECK",
+    "action": "Email Reminder",
+    "status": "PASSED",
+    "details": {
+      "passed": true,
+      "allowedAction": "Email Reminder",
+      "requiresApproval": false,
+      "failedGuardrails": [],
+      "checks": {
+        "retryLimit": true,
+        "recoveryAmount": true,
+        "recoverability": true
+      },
+      "policy": {
+        "maxRetryAttempts": 3,
+        "maxAutomaticRecoveryAmount": 25000,
+        "minimumRecoverability": 30
+      }
+    }
+  },
+  {
+    "auditId": "AUD-1788534127826-yr9tc",
+    "timestamp": "2026-09-04T15:02:07.826Z",
+    "transactionId": "DEMO-1788534123924",
+    "eventType": "AI_DECISION",
+    "action": "Email Reminder",
+    "status": "DECIDED",
+    "details": {
+      "reason": "Customer engagement via email to recover payment",
+      "recoverability": 97,
+      "riskScore": 41,
+      "amount": 2000,
+      "failureReason": "Card declined",
+      "requiresApproval": false
+    }
+  },
+  {
+    "auditId": "AUD-1788534127828-j31i3",
+    "timestamp": "2026-09-04T15:02:07.828Z",
+    "transactionId": "DEMO-1788534123924",
+    "eventType": "POLICY_CHECK",
+    "action": "Email Reminder",
+    "status": "PASSED",
+    "details": {
+      "passed": true,
+      "allowedAction": "Email Reminder",
+      "requiresApproval": false,
+      "failedGuardrails": [],
+      "checks": {
+        "retryLimit": true,
+        "recoveryAmount": true,
+        "recoverability": true
+      },
+      "policy": {
+        "maxRetryAttempts": 3,
+        "maxAutomaticRecoveryAmount": 25000,
+        "minimumRecoverability": 30
+      }
+    }
+  },
+  {
+    "auditId": "AUD-1788534129911-6utxg",
+    "timestamp": "2026-09-04T15:02:09.911Z",
+    "transactionId": "DEMO-1788534123924",
+    "eventType": "AI_DECISION",
+    "action": "Email Reminder",
+    "status": "DECIDED",
+    "details": {
+      "reason": "Customer engagement via email to recover payment",
+      "recoverability": 97,
+      "riskScore": 41,
+      "amount": 2000,
+      "failureReason": "Card declined",
+      "requiresApproval": false
+    }
+  },
+  {
+    "auditId": "AUD-1788534129913-2vyn3",
+    "timestamp": "2026-09-04T15:02:09.913Z",
+    "transactionId": "DEMO-1788534123924",
+    "eventType": "POLICY_CHECK",
+    "action": "Email Reminder",
+    "status": "PASSED",
+    "details": {
+      "passed": true,
+      "allowedAction": "Email Reminder",
+      "requiresApproval": false,
+      "failedGuardrails": [],
+      "checks": {
+        "retryLimit": true,
+        "recoveryAmount": true,
+        "recoverability": true
+      },
+      "policy": {
+        "maxRetryAttempts": 3,
+        "maxAutomaticRecoveryAmount": 25000,
+        "minimumRecoverability": 30
+      }
+    }
+  },
+  {
+    "auditId": "AUD-1788534129949-qealz",
+    "timestamp": "2026-09-04T15:02:09.949Z",
+    "transactionId": "DEMO-1788534123924",
+    "eventType": "AI_DECISION",
+    "action": "Email Reminder",
+    "status": "DECIDED",
+    "details": {
+      "reason": "Customer engagement via email to recover payment",
+      "recoverability": 97,
+      "riskScore": 41,
+      "amount": 2000,
+      "failureReason": "Card declined",
+      "requiresApproval": false
+    }
+  },
+  {
+    "auditId": "AUD-1788534129950-itrfx",
+    "timestamp": "2026-09-04T15:02:09.950Z",
+    "transactionId": "DEMO-1788534123924",
+    "eventType": "POLICY_CHECK",
+    "action": "Email Reminder",
+    "status": "PASSED",
+    "details": {
+      "passed": true,
+      "allowedAction": "Email Reminder",
+      "requiresApproval": false,
+      "failedGuardrails": [],
+      "checks": {
+        "retryLimit": true,
+        "recoveryAmount": true,
+        "recoverability": true
+      },
+      "policy": {
+        "maxRetryAttempts": 3,
+        "maxAutomaticRecoveryAmount": 25000,
+        "minimumRecoverability": 30
+      }
+    }
+  },
+  {
+    "auditId": "AUD-1788534712674-kq1bi",
+    "timestamp": "2026-09-04T15:11:52.674Z",
+    "transactionId": "DEMO-1788534554942",
+    "eventType": "AI_DECISION",
+    "action": "UPI Fallback",
+    "status": "DECIDED",
+    "details": {
+      "reason": "UPI provides an alternative payment method",
+      "recoverability": 77,
+      "riskScore": 53,
+      "amount": 2199,
+      "failureReason": "Checkout Abandoned",
+      "requiresApproval": false
+    }
+  },
+  {
+    "auditId": "AUD-1788534712678-vwul8",
+    "timestamp": "2026-09-04T15:11:52.678Z",
+    "transactionId": "DEMO-1788534554942",
+    "eventType": "POLICY_CHECK",
+    "action": "UPI Fallback",
+    "status": "PASSED",
+    "details": {
+      "passed": true,
+      "allowedAction": "UPI Fallback",
+      "requiresApproval": false,
+      "failedGuardrails": [],
+      "checks": {
+        "retryLimit": true,
+        "recoveryAmount": true,
+        "recoverability": true
+      },
+      "policy": {
+        "maxRetryAttempts": 3,
+        "maxAutomaticRecoveryAmount": 25000,
+        "minimumRecoverability": 30
+      }
+    }
+  },
+  {
+    "auditId": "AUD-1788534872010-zccym",
+    "timestamp": "2026-09-04T15:14:32.010Z",
+    "transactionId": "TXN-2847020",
+    "eventType": "AI_DECISION",
+    "action": "WhatsApp Reminder",
+    "status": "DECIDED",
+    "details": {
+      "reason": "ML recommended \"WhatsApp Reminder\" but guardrails changed it to \"Human Escalation\": Automatic recovery blocked because transaction amount ₹80871 exceeds the ₹25000 limit.",
+      "recoverability": 100,
+      "riskScore": 33,
+      "amount": 80871,
+      "failureReason": "Price Changed",
+      "requiresApproval": true
+    }
+  },
+  {
+    "auditId": "AUD-1788534872014-yfy1f",
+    "timestamp": "2026-09-04T15:14:32.014Z",
+    "transactionId": "TXN-2847020",
+    "eventType": "POLICY_CHECK",
+    "action": "WhatsApp Reminder",
+    "status": "BLOCKED",
+    "details": {
+      "passed": false,
+      "allowedAction": "Human Escalation",
+      "requiresApproval": true,
+      "failedGuardrails": [
+        {
+          "passed": false,
+          "guardrail": "Automatic Recovery Amount",
+          "reason": "Automatic recovery blocked because transaction amount ₹80871 exceeds the ₹25000 limit."
+        }
+      ],
+      "checks": {
+        "retryLimit": true,
+        "recoveryAmount": false,
+        "recoverability": true
+      },
+      "policy": {
+        "maxRetryAttempts": 3,
+        "maxAutomaticRecoveryAmount": 25000,
+        "minimumRecoverability": 30
+      }
+    }
+  },
+  {
+    "auditId": "AUD-1788535118366-gmett",
+    "timestamp": "2026-09-04T15:18:38.366Z",
+    "transactionId": "TXN-2847020",
+    "eventType": "AI_DECISION",
+    "action": "WhatsApp Reminder",
+    "status": "DECIDED",
+    "details": {
+      "reason": "ML recommended \"WhatsApp Reminder\" but guardrails changed it to \"Human Escalation\": Automatic recovery blocked because transaction amount ₹80871 exceeds the ₹25000 limit.",
+      "recoverability": 100,
+      "riskScore": 33,
+      "amount": 80871,
+      "failureReason": "Price Changed",
+      "requiresApproval": true
+    }
+  },
+  {
+    "auditId": "AUD-1788535118367-7y4nz",
+    "timestamp": "2026-09-04T15:18:38.367Z",
+    "transactionId": "TXN-2847020",
+    "eventType": "POLICY_CHECK",
+    "action": "WhatsApp Reminder",
+    "status": "BLOCKED",
+    "details": {
+      "passed": false,
+      "allowedAction": "Human Escalation",
+      "requiresApproval": true,
+      "failedGuardrails": [
+        {
+          "passed": false,
+          "guardrail": "Automatic Recovery Amount",
+          "reason": "Automatic recovery blocked because transaction amount ₹80871 exceeds the ₹25000 limit."
+        }
+      ],
+      "checks": {
+        "retryLimit": true,
+        "recoveryAmount": false,
+        "recoverability": true
+      },
+      "policy": {
+        "maxRetryAttempts": 3,
+        "maxAutomaticRecoveryAmount": 25000,
+        "minimumRecoverability": 30
+      }
+    }
+  },
+  {
+    "auditId": "AUD-1788535214356-8yr5a",
+    "timestamp": "2026-09-04T15:20:14.357Z",
+    "transactionId": "DEMO-1788534554943",
+    "eventType": "AI_DECISION",
+    "action": "Human Escalation",
+    "status": "DECIDED",
+    "details": {
+      "reason": "ML confidence too low for automated action or guardrail blocked automatic recovery",
+      "recoverability": 45,
+      "riskScore": 45,
+      "amount": 1500,
+      "failureReason": "Card Declined",
+      "requiresApproval": false
+    }
+  },
+  {
+    "auditId": "AUD-1788535214360-mheir",
+    "timestamp": "2026-09-04T15:20:14.360Z",
+    "transactionId": "DEMO-1788534554943",
+    "eventType": "POLICY_CHECK",
+    "action": "Human Escalation",
+    "status": "PASSED",
+    "details": {
+      "passed": true,
+      "allowedAction": "Human Escalation",
+      "requiresApproval": false,
+      "failedGuardrails": [],
+      "checks": {
+        "retryLimit": true,
+        "recoveryAmount": true,
+        "recoverability": true
+      },
+      "policy": {
+        "maxRetryAttempts": 3,
+        "maxAutomaticRecoveryAmount": 25000,
+        "minimumRecoverability": 30
+      }
+    }
+  },
+  {
+    "auditId": "AUD-1788535405139-d8qfg",
+    "timestamp": "2026-09-04T15:23:25.139Z",
+    "transactionId": "DEMO-1788534554944",
+    "eventType": "AI_DECISION",
+    "action": "Smart Retry",
+    "status": "DECIDED",
+    "details": {
+      "reason": "Network Error may be resolved with a retry per ML analysis",
+      "recoverability": 100,
+      "riskScore": 26,
+      "amount": 2000,
+      "failureReason": "Network Error",
+      "requiresApproval": false
+    }
+  },
+  {
+    "auditId": "AUD-1788535405141-woy33",
+    "timestamp": "2026-09-04T15:23:25.141Z",
+    "transactionId": "DEMO-1788534554944",
+    "eventType": "POLICY_CHECK",
+    "action": "Smart Retry",
+    "status": "PASSED",
+    "details": {
+      "passed": true,
+      "allowedAction": "Smart Retry",
+      "requiresApproval": false,
+      "failedGuardrails": [],
+      "checks": {
+        "retryLimit": true,
+        "recoveryAmount": true,
+        "recoverability": true
+      },
+      "policy": {
+        "maxRetryAttempts": 3,
+        "maxAutomaticRecoveryAmount": 25000,
+        "minimumRecoverability": 30
+      }
+    }
+  },
+  {
+    "auditId": "AUD-1788535405441-j9g7v",
+    "timestamp": "2026-09-04T15:23:25.441Z",
+    "transactionId": "DEMO-1788534554944",
+    "eventType": "ACTION_RESULT",
+    "action": "Smart Retry",
+    "status": "ORDER_CREATED",
+    "details": {
+      "executed": true,
+      "provider": "Razorpay",
+      "mode": "TEST",
+      "amount": 2000,
+      "razorpayOrderId": "order_TY0Y0xSbpdBxkV",
+      "orderStatus": "created"
+    }
   }
 ]

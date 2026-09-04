@@ -1,12 +1,57 @@
 import { findTransaction } from './transactionStore.js'
 import { checkGuardrails } from './guardrailService.js'
+import { predictAll } from './mlInferenceService.js'
 
-function decideRecoveryAction(transaction) {
+function getReasonForAction(action, transaction) {
+  const {
+    failureReason,
+    attemptCount,
+  } = transaction
+
+  if (action === 'No Action') {
+    return 'Recovery potential is too low per ML analysis'
+  }
+
+  if (action === 'Human Escalation') {
+    if (attemptCount >= 3) {
+      return 'Multiple payment attempts require human review'
+    }
+
+    return 'ML confidence too low for automated action or guardrail blocked automatic recovery'
+  }
+
+  if (action === 'Card Update Request') {
+    return 'Saved payment credential has expired'
+  }
+
+  if (action === 'Smart Retry') {
+    return `${failureReason} may be resolved with a retry per ML analysis`
+  }
+
+  if (action === 'Payment Link') {
+    return 'Customer shows sufficient recovery potential through an alternate payment flow'
+  }
+
+  if (action === 'UPI Fallback') {
+    return 'UPI provides an alternative payment method'
+  }
+
+  if (action === 'WhatsApp Reminder') {
+    return 'Customer engagement via WhatsApp to recover payment'
+  }
+
+  if (action === 'Email Reminder') {
+    return 'Customer engagement via email to recover payment'
+  }
+
+  return 'Recovery action selected by ML model'
+}
+
+function getFallbackAction(transaction) {
   const {
     type,
     failureReason,
     amount,
-    attemptCount,
     recoverability,
   } = transaction
 
@@ -14,7 +59,7 @@ function decideRecoveryAction(transaction) {
     return 'No Action'
   }
 
-  if (attemptCount >= 3) {
+  if (transaction.attemptCount >= 3) {
     return 'Human Escalation'
   }
 
@@ -62,48 +107,6 @@ function decideRecoveryAction(transaction) {
   return 'Human Escalation'
 }
 
-function getReason(transaction, action) {
-  const {
-    failureReason,
-    recoverability,
-    attemptCount,
-  } = transaction
-
-  if (action === 'No Action') {
-    return 'Recovery potential is too low'
-  }
-
-  if (action === 'Human Escalation') {
-    if (attemptCount >= 3) {
-      return 'Multiple payment attempts require human review'
-    }
-
-    if (transaction.amount > 25000 && recoverability >= 70) {
-      return 'High-value recovery requires human approval'
-    }
-
-    return 'Automated recovery rule did not provide a safe action'
-  }
-
-  if (action === 'Card Update Request') {
-    return 'Saved payment credential has expired'
-  }
-
-  if (action === 'Smart Retry') {
-    return `${failureReason} may be resolved with a retry`
-  }
-
-  if (action === 'Payment Link') {
-    return 'Customer shows sufficient recovery potential through an alternate payment flow'
-  }
-
-  if (action === 'UPI Fallback') {
-    return 'UPI provides an alternative payment method'
-  }
-
-  return 'Recovery action selected based on transaction attributes'
-}
-
 export function getRecoveryDecision(txnId) {
   const transaction = findTransaction(txnId)
 
@@ -111,30 +114,51 @@ export function getRecoveryDecision(txnId) {
     return null
   }
 
-  const initialAction =
-    decideRecoveryAction(transaction)
+  const ml = predictAll(transaction)
+
+  let aiRecommendation
+  let aiConfidence
+  let reason
+
+  if (ml.mlAvailable) {
+    aiRecommendation = ml.action.prediction
+    aiConfidence = Math.round(ml.action.confidence * 100)
+    reason = getReasonForAction(aiRecommendation, transaction)
+  } else {
+    aiRecommendation = getFallbackAction(transaction)
+    aiConfidence = 70
+    reason = getReasonForAction(aiRecommendation, transaction)
+  }
 
   const guardrailResult =
-    checkGuardrails(txnId, initialAction)
+    checkGuardrails(txnId, aiRecommendation)
 
   const finalAction =
     guardrailResult.allowedAction
 
-  const reason =
-    getReason(transaction, finalAction)
+  const guardrailBlocked = !guardrailResult.passed
+
+  const finalReason = guardrailBlocked
+    ? `ML recommended "${aiRecommendation}" but guardrails changed it to "${finalAction}": ${guardrailResult.failedGuardrails.map(g => g.reason).join('; ')}`
+    : reason
+
+  const mlRiskScore = ml.mlAvailable ? ml.riskScore.prediction : transaction.riskScore
+  const mlRecoverabilityPct = ml.mlAvailable
+    ? Math.round(ml.recoverability.probability * 100)
+    : transaction.recoverability
 
   return {
     transactionId: transaction.id,
 
     action: finalAction,
 
-    initialAction,
+    initialAction: aiRecommendation,
 
-    reason,
+    reason: finalReason,
 
-    recoverability: transaction.recoverability,
+    recoverability: mlRecoverabilityPct,
 
-    riskScore: transaction.riskScore,
+    riskScore: mlRiskScore,
 
     amount: transaction.amount,
 
@@ -148,5 +172,7 @@ export function getRecoveryDecision(txnId) {
       guardrailResult.requiresApproval,
 
     guardrails: guardrailResult,
+
+    mlPrediction: ml,
   }
 }

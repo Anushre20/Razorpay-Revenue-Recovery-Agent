@@ -9,6 +9,8 @@ import auditRoutes from './routes/auditRoutes.js'
 import leakageRoutes from './routes/leakageRoutes.js'
 import evaluationRoutes from './routes/evaluationRoutes.js'
 import integrationRoutes from './routes/integrationRoutes.js'
+import agentRoutes from './routes/agentRoutes.js'
+import { loadModels } from './services/mlInferenceService.js'
 
 dotenv.config()
 
@@ -25,6 +27,7 @@ app.use('/api/audit', auditRoutes)
 app.use('/api/leakage', leakageRoutes)
 app.use('/api/evaluation', evaluationRoutes)
 app.use('/api/integration', integrationRoutes)
+app.use('/api/agent', agentRoutes)
 
 app.get('/', (req, res) => {
   res.json({
@@ -40,6 +43,8 @@ app.get('/api/health', (req, res) => {
     status: 'healthy',
   })
 })
+
+loadModels()
 
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`Revenue Recovery Backend running on port ${PORT}`)
