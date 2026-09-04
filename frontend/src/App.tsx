@@ -16,7 +16,8 @@ import {
   fetchDashboard, fetchMerchants, executeRecovery, fetchEvaluation,
   fetchIntegrationStatus, syncRazorpayTransactions, evaluateTransaction,
   fetchMLMetrics, fetchAgentRuns, fetchAgentRunForTxn, triggerAgentRecovery,
-  fetchAgentStats, approveAgentRun, rejectAgentRun
+  fetchAgentStats, approveAgentRun, rejectAgentRun,
+  fetchMerchantIntelligence
 } from "./api";
 
 
@@ -270,19 +271,29 @@ function useApiData<T>(fetcher: () => Promise<T>, deps: unknown[] = []) {
 }
 
 function DashboardView({ onNavigate, dateRange }: { onNavigate: (n: NavItem) => void; dateRange: string }) {
-  const dashboard = useApiData(fetchDashboard);
+  const mi = useApiData(fetchMerchantIntelligence);
   const leakage = useApiData(fetchLeakage);
-  const agentStatsRes = useApiData(fetchAgentStats);
   const agentRunsRes = useApiData(fetchAgentRuns);
-  const dashboardData = dashboard.data?.data;
+  const intelligence = mi.data?.data;
   const allLeakageTxns = leakage.data?.data || [];
   const leakageTxns = filterByDateRange(allLeakageTxns, Number(dateRange));
-  const leakageSummary = leakage.data?.summary;
-  const agentStats = agentStatsRes.data?.data;
   const agentRuns = agentRunsRes.data?.data || [];
 
-  if (dashboard.loading || leakage.loading) return <LoadingSpinner />;
-  if (dashboard.error || leakage.error) return <ErrorMessage message={dashboard.error || leakage.error || ''} onRetry={() => { dashboard.retry(); leakage.retry(); }} />;
+  if (mi.loading || leakage.loading) return <LoadingSpinner />;
+  if (mi.error || leakage.error) return <ErrorMessage message={mi.error || leakage.error || ''} onRetry={() => { mi.retry(); leakage.retry(); }} />;
+
+  const overview = intelligence?.overview;
+  const failureReasons = intelligence?.failureReasons || [];
+  const agentActivity = intelligence?.agentActivity;
+  const recoveryOpps = intelligence?.recoveryOpportunities || [];
+  const whyLosing = intelligence?.whyLosingMoney || [];
+  const sourceLabel = intelligence?.source === 'razorpay_test + demo' ? 'Current Test Activity'
+    : intelligence?.source === 'razorpay_test' ? 'Razorpay Test Mode'
+    : intelligence?.source === 'demo' ? 'Demo Activity'
+    : 'No Recent Activity';
+  const lastUpdated = intelligence?.lastUpdated
+    ? new Date(intelligence.lastUpdated).toLocaleTimeString()
+    : '';
 
   const typeCounts = { failed: 0, abandoned: 0, subscription: 0 };
   const typeAmounts = { failed: 0, abandoned: 0, subscription: 0 };
@@ -292,16 +303,6 @@ function DashboardView({ onNavigate, dateRange }: { onNavigate: (n: NavItem) => 
     else if (t.type === 'Subscription Failure') { typeCounts.subscription++; typeAmounts.subscription += t.amount; }
   });
   const totalLeakage = typeAmounts.failed + typeAmounts.abandoned + typeAmounts.subscription || 1;
-
-  const failedPct = Math.round((typeAmounts.failed / totalLeakage) * 100);
-  const abandonedPct = Math.round((typeAmounts.abandoned / totalLeakage) * 100);
-  const subscriptionPct = Math.round((typeAmounts.subscription / totalLeakage) * 100);
-
-  const leakageTypeData = [
-    { name: "Failed Payments", value: typeAmounts.failed, fill: "#2563EB" },
-    { name: "Abandoned Checkouts", value: typeAmounts.abandoned, fill: "#7C3AED" },
-    { name: "Subscription Failures", value: typeAmounts.subscription, fill: "#0EA5E9" },
-  ];
 
   const dailyMap: Record<string, { atRisk: number; recovered: number }> = {};
   leakageTxns.forEach((t) => {
@@ -319,49 +320,125 @@ function DashboardView({ onNavigate, dateRange }: { onNavigate: (n: NavItem) => 
 
   return (
     <div className="space-y-5 animate-fade-in">
-      <div className="grid grid-cols-2 gap-4">
-        <StatCard label="At Risk Today" value={fmt(dashboardData?.totalAtRisk || 0)} sub={`${leakageSummary?.totalCases || 0} transactions`} delta="+4.2%" />
-        <StatCard label="Recovered Today" value={fmt(dashboardData?.totalRecovered || 0)} sub={`${dashboardData?.activeCases || 0} active`} accent delta="+7.8%" />
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-[10px] text-gray-500 uppercase tracking-wider">{sourceLabel}</p>
+          {lastUpdated && <p className="text-[10px] text-gray-600">Last updated: {lastUpdated}</p>}
+        </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        <Card className="p-5">
-          <div className="flex items-center justify-between mb-1">
-            <p className="text-xs text-gray-500 uppercase tracking-wider font-medium">Failed Payments</p>
-            <StatusBadge status="At Risk" />
+      {overview ? (
+        <>
+          <div className="grid grid-cols-4 gap-4">
+            <StatCard label="Money at Risk" value={fmt(overview.moneyAtRisk)} sub={`${overview.atRiskCount} active cases`} />
+            <StatCard label="Recovered" value={fmt(overview.recoveredAmount)} sub={`${overview.successfulRecoveries} successful recoveries`} accent />
+            <StatCard label="Active Recovery Cases" value={String(overview.activeRecoveryCases)} sub="Awaiting action" />
+            <StatCard label="New Failures" value={String(overview.newFailures)} sub="Detected in current period" />
           </div>
-          <p className="text-xl font-bold font-display text-white mt-2">{fmt(typeAmounts.failed)}</p>
-          <p className="text-xs text-gray-500 mb-3">{typeCounts.failed} transactions · Avg {fmt(typeCounts.failed ? Math.round(typeAmounts.failed / typeCounts.failed) : 0)}</p>
-          <div className="w-full h-1 bg-[#1E2D45] rounded-full">
-            <div className="h-full bg-red-500 rounded-full" style={{ width: `${failedPct}%` }} />
+
+          <div className="grid grid-cols-4 gap-4">
+            <StatCard label="Blocked Actions" value={String(overview.blockedActions)} sub="Guardrail blocked" />
+            <StatCard label="Pending Actions" value={String(overview.pendingActions)} sub="Running or awaiting approval" />
+            <StatCard label="Recovery Rate" value={`${overview.recoveryRate}%`} sub="Recovered / At Risk" />
+            <StatCard label="Data Points" value={String(intelligence?.dataAvailability?.liveCount || 0)} sub="Live/test transactions" />
           </div>
-          <p className="text-[10px] text-gray-600 mt-1">{failedPct}% of today's leakage</p>
+        </>
+      ) : (
+        <Card className="p-8 text-center">
+          <p className="text-sm text-gray-400">No recent merchant activity</p>
+          <p className="text-xs text-gray-600 mt-1">Create a demo transaction or sync Razorpay to see metrics</p>
         </Card>
+      )}
+
+      {agentActivity && agentActivity.totalRuns > 0 && (
         <Card className="p-5">
-          <div className="flex items-center justify-between mb-1">
-            <p className="text-xs text-gray-500 uppercase tracking-wider font-medium">Abandoned Checkouts</p>
-            <StatusBadge status="In Recovery" />
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="text-sm font-semibold font-display text-white">AI Agent Activity</p>
+              <p className="text-xs text-gray-500">Autonomous recovery pipeline</p>
+            </div>
+            <span onClick={() => onNavigate("agent")} className="text-[10px] text-[#3B82F6] cursor-pointer hover:text-blue-300">View all →</span>
           </div>
-          <p className="text-xl font-bold font-display text-white mt-2">{fmt(typeAmounts.abandoned)}</p>
-          <p className="text-xs text-gray-500 mb-3">{typeCounts.abandoned} sessions · Avg {fmt(typeCounts.abandoned ? Math.round(typeAmounts.abandoned / typeCounts.abandoned) : 0)}</p>
-          <div className="w-full h-1 bg-[#1E2D45] rounded-full">
-            <div className="h-full bg-amber-500 rounded-full" style={{ width: `${abandonedPct}%` }} />
+          <div className="grid grid-cols-5 gap-4">
+            <div className="text-center p-3 bg-[#090E1A] rounded-lg border border-[#1E2D45]">
+              <p className="text-lg font-bold text-white">{agentActivity.totalRuns}</p>
+              <p className="text-[10px] text-gray-500">Total Decisions</p>
+            </div>
+            <div className="text-center p-3 bg-[#090E1A] rounded-lg border border-[#1E2D45]">
+              <p className="text-lg font-bold text-emerald-400">{agentActivity.completed}</p>
+              <p className="text-[10px] text-gray-500">Completed</p>
+            </div>
+            <div className="text-center p-3 bg-[#090E1A] rounded-lg border border-[#1E2D45]">
+              <p className="text-lg font-bold text-amber-400">{agentActivity.blocked + agentActivity.awaitingApproval}</p>
+              <p className="text-[10px] text-gray-500">Blocked / Awaiting</p>
+            </div>
+            <div className="text-center p-3 bg-[#090E1A] rounded-lg border border-[#1E2D45]">
+              <p className="text-lg font-bold text-[#3B82F6]">{agentActivity.running}</p>
+              <p className="text-[10px] text-gray-500">Running</p>
+            </div>
+            <div className="text-center p-3 bg-[#090E1A] rounded-lg border border-[#1E2D45]">
+              <p className="text-lg font-bold text-red-400">{agentActivity.executionFailed + agentActivity.failed}</p>
+              <p className="text-[10px] text-gray-500">Failed</p>
+            </div>
           </div>
-          <p className="text-[10px] text-gray-600 mt-1">{abandonedPct}% of today's leakage</p>
         </Card>
+      )}
+
+      {whyLosing.length > 0 && (
         <Card className="p-5">
-          <div className="flex items-center justify-between mb-1">
-            <p className="text-xs text-gray-500 uppercase tracking-wider font-medium">Subscription Failures</p>
-            <StatusBadge status="At Risk" />
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="text-sm font-semibold font-display text-white">Why You're Losing Money</p>
+              <p className="text-xs text-gray-500">Ranked by financial impact</p>
+            </div>
           </div>
-          <p className="text-xl font-bold font-display text-white mt-2">{fmt(typeAmounts.subscription)}</p>
-          <p className="text-xs text-gray-500 mb-3">{typeCounts.subscription} renewals · Avg {fmt(typeCounts.subscription ? Math.round(typeAmounts.subscription / typeCounts.subscription) : 0)}</p>
-          <div className="w-full h-1 bg-[#1E2D45] rounded-full">
-            <div className="h-full bg-purple-500 rounded-full" style={{ width: `${subscriptionPct}%` }} />
+          <div className="space-y-3">
+            {whyLosing.slice(0, 5).map((item) => (
+              <div key={item.reason} className="flex items-center gap-3 p-3 bg-[#090E1A] rounded-lg border border-[#1E2D45]">
+                <span className="text-xs font-bold text-gray-600 w-5">#{item.rank}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-white truncate">{item.reason}</p>
+                  <p className="text-[10px] text-gray-500">{item.count} transactions</p>
+                </div>
+                <span className="text-xs font-mono text-white">{fmt(item.totalAmount)}</span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                  item.impact === 'High' ? 'text-red-400 bg-red-500/10' :
+                  item.impact === 'Medium' ? 'text-amber-400 bg-amber-500/10' :
+                  'text-gray-400 bg-gray-500/10'
+                }`}>{item.impact}</span>
+              </div>
+            ))}
           </div>
-          <p className="text-[10px] text-gray-600 mt-1">{subscriptionPct}% of today's leakage</p>
         </Card>
-      </div>
+      )}
+
+      {recoveryOpps.length > 0 && (
+        <Card className="p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="text-sm font-semibold font-display text-white">Recovery Opportunities</p>
+              <p className="text-xs text-gray-500">Cases waiting for action</p>
+            </div>
+            <span onClick={() => onNavigate("diagnosis")} className="text-[10px] text-[#3B82F6] cursor-pointer hover:text-blue-300">View all →</span>
+          </div>
+          <div className="space-y-2">
+            {recoveryOpps.slice(0, 5).map((opp) => (
+              <div key={opp.transactionId} onClick={() => onNavigate("diagnosis")} className="flex items-center gap-3 p-3 bg-[#090E1A] rounded-lg border border-[#1E2D45] cursor-pointer table-row-hover">
+                <span className="text-[11px] text-[#3B82F6] font-mono flex-shrink-0">{opp.transactionId}</span>
+                <span className="text-xs font-mono text-white flex-shrink-0">{fmt(opp.amount)}</span>
+                <span className="text-[10px] text-gray-400 flex-shrink-0">{opp.failureReason}</span>
+                <span className="text-[10px] text-[#A78BFA] flex-shrink-0">{opp.agentAction}</span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded flex-shrink-0 ${
+                  opp.policyStatus === 'COMPLETED' ? 'text-emerald-400 bg-emerald-500/10' :
+                  opp.policyStatus === 'BLOCKED' ? 'text-amber-400 bg-amber-500/10' :
+                  'text-gray-400 bg-gray-500/10'
+                }`}>{opp.policyStatus}</span>
+                <span className="text-[10px] text-gray-500 ml-auto">{opp.nextAction}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       <div className="grid grid-cols-3 gap-4">
         <Card className="col-span-2 p-5">
@@ -407,8 +484,16 @@ function DashboardView({ onNavigate, dateRange }: { onNavigate: (n: NavItem) => 
           <p className="text-xs text-gray-500 mb-4">Distribution this week</p>
           <ResponsiveContainer width="100%" height={160}>
             <PieChart>
-              <Pie data={leakageTypeData} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={3} dataKey="value">
-                {leakageTypeData.map((entry, i) => (
+              <Pie data={[
+                { name: "Failed Payments", value: typeAmounts.failed, fill: "#2563EB" },
+                { name: "Abandoned Checkouts", value: typeAmounts.abandoned, fill: "#7C3AED" },
+                { name: "Subscription Failures", value: typeAmounts.subscription, fill: "#0EA5E9" },
+              ]} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={3} dataKey="value">
+                {[
+                  { fill: "#2563EB" },
+                  { fill: "#7C3AED" },
+                  { fill: "#0EA5E9" },
+                ].map((entry, i) => (
                   <Cell key={i} fill={entry.fill} />
                 ))}
               </Pie>
@@ -416,7 +501,11 @@ function DashboardView({ onNavigate, dateRange }: { onNavigate: (n: NavItem) => 
             </PieChart>
           </ResponsiveContainer>
           <div className="space-y-2 mt-2">
-            {leakageTypeData.map((d) => (
+            {[
+              { name: "Failed Payments", value: typeAmounts.failed, fill: "#2563EB" },
+              { name: "Abandoned Checkouts", value: typeAmounts.abandoned, fill: "#7C3AED" },
+              { name: "Subscription Failures", value: typeAmounts.subscription, fill: "#0EA5E9" },
+            ].map((d) => (
               <div key={d.name} className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full" style={{ background: d.fill }} />
@@ -460,58 +549,45 @@ function DashboardView({ onNavigate, dateRange }: { onNavigate: (n: NavItem) => 
         </table>
       </Card>
 
-      {agentStats && agentStats.total > 0 && (
-        <>
-          <div className="grid grid-cols-5 gap-4">
-            <StatCard label="Agent Runs" value={String(agentStats.total)} sub="Total autonomous runs" />
-            <StatCard label="Completed" value={String(agentStats.completed)} sub="Successfully finished" accent />
-            <StatCard label="Running" value={String(agentStats.running)} sub="In progress" />
-            <StatCard label="Awaiting Approval" value={String(agentStats.humanApproval)} sub="Needs review" />
-            <StatCard label="Failed/Blocked" value={String(agentStats.failed + agentStats.blocked + agentStats.executionFailed)} sub="Requires attention" />
+      {agentRuns.length > 0 && (
+        <Card className="p-5">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-sm font-semibold font-display text-white">Recent Agent Activity</p>
+            <span onClick={() => onNavigate("agent")} className="text-[10px] text-[#3B82F6] cursor-pointer hover:text-blue-300">View all →</span>
           </div>
-
-          <Card className="p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <p className="text-sm font-semibold font-display text-white">Recent Agent Activity</p>
-                <p className="text-xs text-gray-500">Autonomous recovery pipeline runs</p>
-              </div>
-              <span onClick={() => onNavigate("agent")} className="text-[10px] text-[#3B82F6] cursor-pointer hover:text-blue-300">View all →</span>
-            </div>
-            <div className="space-y-2">
-              {agentRuns.slice(0, 5).map((run) => {
-                const execResult = run.stages?.execute?.result;
-                const policyResult = run.stages?.policy?.result;
-                return (
-                  <div key={run.agentRunId} className="flex items-center gap-3 p-3 bg-[#090E1A] rounded-lg border border-[#1E2D45]">
-                    <span className="text-[10px] text-gray-600 font-mono w-16">{run.startedAt ? new Date(run.startedAt).toLocaleTimeString() : ''}</span>
-                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                      run.status === 'COMPLETED' ? 'bg-emerald-400' :
-                      run.status === 'RUNNING' ? 'bg-[#3B82F6] animate-pulse' :
-                      run.status === 'BLOCKED' ? 'bg-amber-400' :
-                      'bg-red-400'
-                    }`} />
-                    <span className="text-[11px] text-gray-300 font-mono flex-shrink-0">{run.transactionId}</span>
-                    <span className="text-[10px] text-[#A78BFA] flex-shrink-0">{(run.stages?.decide?.result as any)?.aiRecommendation || '-'}</span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded flex-shrink-0 ${
-                      policyResult?.passed ? 'text-emerald-400 bg-emerald-500/10' : 'text-amber-400 bg-amber-500/10'
-                    }`}>
-                      {policyResult?.passed ? 'APPROVED' : 'BLOCKED'}
-                    </span>
-                    <span className="text-[10px] text-gray-500 flex-shrink-0">{execResult?.status || '-'}</span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium border ml-auto ${
-                      run.status === 'COMPLETED' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' :
-                      run.status === 'RUNNING' ? 'text-[#3B82F6] bg-[#2563EB]/10 border-[#2563EB]/30' :
-                      'text-amber-400 bg-amber-500/10 border-amber-500/30'
-                    }`}>
-                      {run.status.replace(/_/g, ' ')}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </Card>
-        </>
+          <div className="space-y-2">
+            {agentRuns.slice(0, 5).map((run) => {
+              const execResult = run.stages?.execute?.result;
+              const policyResult = run.stages?.policy?.result;
+              return (
+                <div key={run.agentRunId} className="flex items-center gap-3 p-3 bg-[#090E1A] rounded-lg border border-[#1E2D45]">
+                  <span className="text-[10px] text-gray-600 font-mono w-16">{run.startedAt ? new Date(run.startedAt).toLocaleTimeString() : ''}</span>
+                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                    run.status === 'COMPLETED' ? 'bg-emerald-400' :
+                    run.status === 'RUNNING' ? 'bg-[#3B82F6] animate-pulse' :
+                    run.status === 'BLOCKED' ? 'bg-amber-400' :
+                    'bg-red-400'
+                  }`} />
+                  <span className="text-[11px] text-gray-300 font-mono flex-shrink-0">{run.transactionId}</span>
+                  <span className="text-[10px] text-[#A78BFA] flex-shrink-0">{(run.stages?.decide?.result as any)?.aiRecommendation || '-'}</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded flex-shrink-0 ${
+                    policyResult?.passed ? 'text-emerald-400 bg-emerald-500/10' : 'text-amber-400 bg-amber-500/10'
+                  }`}>
+                    {policyResult?.passed ? 'APPROVED' : 'BLOCKED'}
+                  </span>
+                  <span className="text-[10px] text-gray-500 flex-shrink-0">{execResult?.status || '-'}</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium border ml-auto ${
+                    run.status === 'COMPLETED' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' :
+                    run.status === 'RUNNING' ? 'text-[#3B82F6] bg-[#2563EB]/10 border-[#2563EB]/30' :
+                    'text-amber-400 bg-amber-500/10 border-amber-500/30'
+                  }`}>
+                    {run.status.replace(/_/g, ' ')}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
       )}
     </div>
   );
@@ -1685,6 +1761,10 @@ function AnalyticsView({ dateRange }: { dateRange: string }) {
         <Card className="p-5"><LoadingSpinner /></Card>
       ) : evaluation ? (
         <>
+          <div className="border-t border-[#1E2D45] pt-4">
+            <p className="text-[10px] text-gray-500 uppercase tracking-wider font-mono font-semibold">Model Evaluation — Historical 5,000 Transactions</p>
+          </div>
+
           <Card className="p-5">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-7 h-7 rounded-lg bg-[#2563EB]/20 flex items-center justify-center">
@@ -2452,95 +2532,136 @@ function IntegrationView() {
 }
 
 function MerchantsView() {
-  const { data, loading, error, retry } = useApiData(fetchMerchants);
-  const merchantsList = data?.data || [];
+  const mi = useApiData(fetchMerchantIntelligence);
+  const intelligence = mi.data?.data;
 
-  const merchantVisuals: Record<string, { logo: string; color: string; trend: string }> = {
-    UrbanKart: { logo: "U", color: "#EF4444", trend: "+12%" },
-    TechNova: { logo: "T", color: "#F59E0B", trend: "+8%" },
-    StreamBox: { logo: "S", color: "#10B981", trend: "+15%" },
-    "Zomato Foods Pvt Ltd": { logo: "Z", color: "#EF4444", trend: "+12%" },
-    "Flipkart Internet": { logo: "F", color: "#F59E0B", trend: "+8%" },
-    "Swiggy India": { logo: "S", color: "#10B981", trend: "+15%" },
-    "Groww Invest": { logo: "G", color: "#6366F1", trend: "-3%" },
-    "Byju's Learning": { logo: "B", color: "#EC4899", trend: "+22%" },
-    "Nykaa Fashion": { logo: "N", color: "#F97316", trend: "+5%" },
-  };
+  if (mi.loading) return <LoadingSpinner />;
+  if (mi.error) return <ErrorMessage message={mi.error} onRetry={mi.retry} />;
 
-  const enriched = merchantsList.map(m => ({
-    ...m,
-    logo: merchantVisuals[m.name]?.logo || m.name[0],
-    color: merchantVisuals[m.name]?.color || "#6366F1",
-    trend: merchantVisuals[m.name]?.trend || "+0%",
-  }));
-
-  if (loading) return <LoadingSpinner />;
-  if (error) return <ErrorMessage message={error} onRetry={retry} />;
+  const overview = intelligence?.overview;
+  const failureReasons = intelligence?.failureReasons || [];
+  const paymentMethods = intelligence?.paymentMethods || [];
+  const customerSegments = intelligence?.customerSegments || [];
+  const recoveryActions = intelligence?.recoveryActions || [];
+  const sourceLabel = intelligence?.source === 'razorpay_test + demo' ? 'Current Test Activity'
+    : intelligence?.source === 'razorpay_test' ? 'Razorpay Test Mode'
+    : intelligence?.source === 'demo' ? 'Demo Activity'
+    : 'No Recent Activity';
 
   return (
-    <div className="space-y-4 animate-fade-in">
-      <div className="grid grid-cols-4 gap-4">
-        <StatCard label="Active Merchants" value={String(enriched.length)} sub="With open cases" />
-        <StatCard label="Total At Risk" value={fmt(enriched.reduce((s, m) => s + m.atRisk, 0))} sub="Across all merchants" />
-        <StatCard label="Total Recovered" value={fmt(enriched.reduce((s, m) => s + m.recovered, 0))} sub="This week" accent />
-        <StatCard label="Best Recovery" value={`${Math.max(...enriched.map(m => m.recoveryRate))}%`} sub={enriched.reduce((best, m) => m.recoveryRate > best.recoveryRate ? m : best, enriched[0])?.name || '—'} />
+    <div className="space-y-5 animate-fade-in">
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] text-gray-500 uppercase tracking-wider">{sourceLabel}</p>
       </div>
+
+      {overview ? (
+        <div className="grid grid-cols-4 gap-4">
+          <StatCard label="Money at Risk" value={fmt(overview.moneyAtRisk)} sub={`${overview.atRiskCount} active cases`} />
+          <StatCard label="Recovered" value={fmt(overview.recoveredAmount)} sub={`${overview.successfulRecoveries} successful`} accent />
+          <StatCard label="Active Recovery" value={String(overview.activeRecoveryCases)} sub="Awaiting action" />
+          <StatCard label="Recovery Rate" value={`${overview.recoveryRate}%`} sub="Recovered / At Risk" />
+        </div>
+      ) : (
+        <Card className="p-8 text-center">
+          <p className="text-sm text-gray-400">No recent merchant activity</p>
+        </Card>
+      )}
 
       <div className="grid grid-cols-3 gap-4">
-        {enriched.map((m) => (
-          <Card key={m.id} className="p-5">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white text-sm" style={{ background: m.color }}>
-                {m.logo}
+        <Card className="p-5">
+          <p className="text-sm font-semibold font-display text-white mb-4">Failure Reasons</p>
+          <div className="space-y-3">
+            {failureReasons.slice(0, 5).map((fr) => (
+              <div key={fr.reason} className="p-3 bg-[#090E1A] rounded-lg border border-[#1E2D45]">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs font-medium text-white">{fr.reason}</p>
+                  <span className="text-[10px] font-mono text-gray-400">{fr.percentage}%</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-gray-500">{fr.count} cases</span>
+                  <span className="text-xs font-mono text-white">{fmt(fr.totalAmount)}</span>
+                </div>
+                <div className="w-full h-1 bg-[#1E2D45] rounded-full mt-2">
+                  <div className="h-full bg-red-500 rounded-full" style={{ width: `${fr.percentage}%` }} />
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-white truncate">{m.name}</p>
-                <p className="text-[10px] text-gray-500 font-mono">{m.activeCases} active cases</p>
-              </div>
-              <div className={`text-[10px] font-mono px-2 py-0.5 rounded font-medium ${m.trend.startsWith("+") ? "text-emerald-400 bg-emerald-500/10" : "text-red-400 bg-red-500/10"}`}>
-                {m.trend}
-              </div>
-            </div>
+            ))}
+          </div>
+        </Card>
 
-            <div className="grid grid-cols-2 gap-3 mb-4">
-              <div className="p-2.5 bg-[#1A2332] rounded-lg border border-[#1E2D45]">
-                <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-1">At Risk</p>
-                <p className="text-sm font-bold font-mono text-red-400">{fmt(m.atRisk)}</p>
+        <Card className="p-5">
+          <p className="text-sm font-semibold font-display text-white mb-4">Payment Methods</p>
+          <div className="space-y-3">
+            {paymentMethods.slice(0, 5).map((pm) => (
+              <div key={pm.method} className="p-3 bg-[#090E1A] rounded-lg border border-[#1E2D45]">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs font-medium text-white">{pm.method}</p>
+                  <span className="text-[10px] font-mono text-gray-400">{pm.avgRecoverability}% recov.</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-gray-500">{pm.failedCount} failures</span>
+                  <span className="text-xs font-mono text-white">{fmt(pm.atRiskAmount)}</span>
+                </div>
+                <div className="w-full h-1 bg-[#1E2D45] rounded-full mt-2">
+                  <div className="h-full bg-[#3B82F6] rounded-full" style={{ width: `${pm.avgRecoverability}%` }} />
+                </div>
               </div>
-              <div className="p-2.5 bg-[#1A2332] rounded-lg border border-[#1E2D45]">
-                <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-1">Recovered</p>
-                <p className="text-sm font-bold font-mono text-emerald-400">{fmt(m.recovered)}</p>
-              </div>
-            </div>
+            ))}
+          </div>
+        </Card>
 
-            <div>
-              <div className="flex justify-between text-[10px] mb-1.5">
-                <span className="text-gray-500">Recovery Rate</span>
-                <span className="text-white font-mono font-medium">{m.recoveryRate}%</span>
+        <Card className="p-5">
+          <p className="text-sm font-semibold font-display text-white mb-4">Customer Segments</p>
+          <div className="space-y-3">
+            {customerSegments.slice(0, 5).map((cs) => (
+              <div key={cs.segment} className="p-3 bg-[#090E1A] rounded-lg border border-[#1E2D45]">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs font-medium text-white">{cs.segment}</p>
+                  <span className="text-[10px] font-mono text-gray-400">{cs.avgRecoverability}% recov.</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-gray-500">{cs.count} cases</span>
+                  <span className="text-xs font-mono text-white">{fmt(cs.atRiskAmount)}</span>
+                </div>
+                <div className="w-full h-1 bg-[#1E2D45] rounded-full mt-2">
+                  <div className="h-full bg-[#A78BFA] rounded-full" style={{ width: `${cs.avgRecoverability}%` }} />
+                </div>
               </div>
-              <div className="w-full h-1.5 bg-[#1E2D45] rounded-full">
-                <div
-                  className="h-full rounded-full"
-                  style={{ width: `${m.recoveryRate}%`, background: m.color }}
-                />
-              </div>
-            </div>
-          </Card>
-        ))}
+            ))}
+          </div>
+        </Card>
       </div>
 
-      <Card className="p-5">
-        <p className="text-sm font-semibold font-display text-white mb-4">Merchant Performance Comparison</p>
-        <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={enriched} barCategoryGap="35%">
-            <XAxis dataKey="name" tick={{ fill: "#4B5563", fontSize: 9 }} axisLine={false} tickLine={false} tickFormatter={(v) => v.split(" ")[0]} />
-            <YAxis tickFormatter={(v) => fmt(v)} tick={{ fill: "#4B5563", fontSize: 10 }} axisLine={false} tickLine={false} />
-            <Tooltip formatter={(v: any) => fmtFull(v)} contentStyle={{ background: "#1A2332", border: "1px solid #1E2D45", borderRadius: 8, fontSize: 11 }} />
-            <Bar dataKey="atRisk" name="At Risk" fill="#EF444450" radius={[3, 3, 0, 0]} />
-            <Bar dataKey="recovered" name="Recovered" fill="#2563EB" radius={[3, 3, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </Card>
+      {recoveryActions.length > 0 && (
+        <Card className="p-5">
+          <p className="text-sm font-semibold font-display text-white mb-4">Recovery Action Performance</p>
+          <div className="grid grid-cols-4 gap-3">
+            {recoveryActions.map((ra) => (
+              <div key={ra.action} className="p-3 bg-[#090E1A] rounded-lg border border-[#1E2D45]">
+                <p className="text-xs font-medium text-white mb-2">{ra.action}</p>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-[10px]">
+                    <span className="text-gray-500">Recommended</span>
+                    <span className="text-white font-mono">{ra.recommended}</span>
+                  </div>
+                  <div className="flex justify-between text-[10px]">
+                    <span className="text-gray-500">Executed</span>
+                    <span className="text-emerald-400 font-mono">{ra.executed}</span>
+                  </div>
+                  <div className="flex justify-between text-[10px]">
+                    <span className="text-gray-500">Blocked</span>
+                    <span className="text-amber-400 font-mono">{ra.blocked}</span>
+                  </div>
+                  <div className="flex justify-between text-[10px]">
+                    <span className="text-gray-500">Unsupported</span>
+                    <span className="text-gray-400 font-mono">{ra.unsupported}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

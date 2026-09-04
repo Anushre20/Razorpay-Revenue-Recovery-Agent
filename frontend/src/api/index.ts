@@ -466,3 +466,111 @@ export const triggerAgentRecovery = (txnId: string) => apiPost<{ success: boolea
 export const approveAgentRun = (agentRunId: string) => apiPost<{ success: boolean; data: AgentRun }>(`/api/agent/runs/${agentRunId}/approve`);
 export const rejectAgentRun = (agentRunId: string) => apiPost<{ success: boolean; data: AgentRun }>(`/api/agent/runs/${agentRunId}/reject`);
 export const fetchAgentStats = () => apiGet<{ success: boolean; data: AgentStats }>('/api/agent/stats');
+
+export interface MerchantOverview {
+  moneyAtRisk: number;
+  atRiskCount: number;
+  recoveredAmount: number;
+  successfulRecoveries: number;
+  activeRecoveryCases: number;
+  newFailures: number;
+  blockedActions: number;
+  pendingActions: number;
+  recoveryRate: number;
+}
+
+export interface FailureReasonInsight {
+  reason: string;
+  count: number;
+  totalAmount: number;
+  recoverableAmount: number;
+  percentage: number;
+}
+
+export interface PaymentMethodInsight {
+  method: string;
+  count: number;
+  failedCount: number;
+  totalAmount: number;
+  atRiskAmount: number;
+  recoverableAmount: number;
+  avgRecoverability: number;
+}
+
+export interface SegmentInsight {
+  segment: string;
+  count: number;
+  totalAmount: number;
+  atRiskAmount: number;
+  recoverableAmount: number;
+  recoveredAmount: number;
+  avgRecoverability: number;
+}
+
+export interface RecoveryActionInsight {
+  action: string;
+  recommended: number;
+  executed: number;
+  blocked: number;
+  unsupported: number;
+  pending: number;
+  totalAmount: number;
+  recoveredAmount: number;
+}
+
+export interface RecoveryOpportunity {
+  transactionId: string;
+  amount: number;
+  failureReason: string;
+  paymentMethod: string;
+  customerSegment: string;
+  recoverability: number;
+  riskScore: number;
+  agentAction: string;
+  policyStatus: string;
+  agentStage: string;
+  nextAction: string;
+  source: string;
+  timestamp: string;
+}
+
+export interface WhyLosingMoney {
+  rank: number;
+  reason: string;
+  totalAmount: number;
+  count: number;
+  recoverableAmount: number;
+  impact: string;
+}
+
+export interface MerchantAgentActivity {
+  totalRuns: number;
+  completed: number;
+  running: number;
+  blocked: number;
+  awaitingApproval: number;
+  executionFailed: number;
+  failed: number;
+  rejected: number;
+}
+
+export interface MerchantIntelligence {
+  source: string;
+  lastUpdated: string | null;
+  dataAvailability: {
+    liveCount: number;
+    historicalCount: number;
+    hasLive: boolean;
+    hasHistorical: boolean;
+  };
+  overview: MerchantOverview;
+  failureReasons: FailureReasonInsight[];
+  paymentMethods: PaymentMethodInsight[];
+  customerSegments: SegmentInsight[];
+  recoveryActions: RecoveryActionInsight[];
+  recoveryOpportunities: RecoveryOpportunity[];
+  whyLosingMoney: WhyLosingMoney[];
+  agentActivity: MerchantAgentActivity;
+}
+
+export const fetchMerchantIntelligence = () => apiGet<{ success: boolean; data: MerchantIntelligence }>('/api/merchant/intelligence');

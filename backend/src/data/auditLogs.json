@@ -2013,5 +2013,85 @@
       "razorpayOrderId": "order_TY0Y0xSbpdBxkV",
       "orderStatus": "created"
     }
+  },
+  {
+    "auditId": "AUD-1788536829108-lxnaj",
+    "timestamp": "2026-09-04T15:47:09.108Z",
+    "transactionId": "DEMO-1788536584068",
+    "eventType": "AI_DECISION",
+    "action": "WhatsApp Reminder",
+    "status": "DECIDED",
+    "details": {
+      "reason": "Customer engagement via WhatsApp to recover payment",
+      "recoverability": 45,
+      "riskScore": 45,
+      "amount": 3500,
+      "failureReason": "Card Declined",
+      "requiresApproval": false
+    }
+  },
+  {
+    "auditId": "AUD-1788536829109-om1iy",
+    "timestamp": "2026-09-04T15:47:09.109Z",
+    "transactionId": "DEMO-1788536584068",
+    "eventType": "POLICY_CHECK",
+    "action": "WhatsApp Reminder",
+    "status": "PASSED",
+    "details": {
+      "passed": true,
+      "allowedAction": "WhatsApp Reminder",
+      "requiresApproval": false,
+      "failedGuardrails": [],
+      "checks": {
+        "retryLimit": true,
+        "recoveryAmount": true,
+        "recoverability": true
+      },
+      "policy": {
+        "maxRetryAttempts": 3,
+        "maxAutomaticRecoveryAmount": 25000,
+        "minimumRecoverability": 30
+      }
+    }
+  },
+  {
+    "auditId": "AUD-1788537958609-pydfy",
+    "timestamp": "2026-09-04T16:05:58.610Z",
+    "transactionId": "DEMO-1788537664633",
+    "eventType": "AI_DECISION",
+    "action": "Human Escalation",
+    "status": "DECIDED",
+    "details": {
+      "reason": "ML confidence too low for automated action or guardrail blocked automatic recovery",
+      "recoverability": 4,
+      "riskScore": 57,
+      "amount": 4000,
+      "failureReason": "Card Declined",
+      "requiresApproval": false
+    }
+  },
+  {
+    "auditId": "AUD-1788537958614-kdskj",
+    "timestamp": "2026-09-04T16:05:58.614Z",
+    "transactionId": "DEMO-1788537664633",
+    "eventType": "POLICY_CHECK",
+    "action": "Human Escalation",
+    "status": "PASSED",
+    "details": {
+      "passed": true,
+      "allowedAction": "Human Escalation",
+      "requiresApproval": false,
+      "failedGuardrails": [],
+      "checks": {
+        "retryLimit": true,
+        "recoveryAmount": true,
+        "recoverability": true
+      },
+      "policy": {
+        "maxRetryAttempts": 3,
+        "maxAutomaticRecoveryAmount": 25000,
+        "minimumRecoverability": 30
+      }
+    }
   }
 ]

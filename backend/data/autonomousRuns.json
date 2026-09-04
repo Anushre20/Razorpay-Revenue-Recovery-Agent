@@ -996,5 +996,229 @@
     },
     "startedAt": "2026-09-04T15:23:25.132Z",
     "completedAt": "2026-09-04T15:23:25.448Z"
+  },
+  {
+    "agentRunId": "AGENT-1788536829102-6v5u7",
+    "transactionId": "DEMO-1788536584068",
+    "source": "demo",
+    "status": "COMPLETED",
+    "currentStage": "AUDIT",
+    "stages": {
+      "detect": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:47:09.103Z",
+        "result": {
+          "transactionId": "DEMO-1788536584068",
+          "source": "demo",
+          "amount": 3500,
+          "type": "Failed Payment",
+          "failureReason": "Card Declined"
+        }
+      },
+      "diagnose": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:47:09.106Z",
+        "result": {
+          "problem": "Payment failed due to card declined",
+          "rootCause": "Issuing bank declined the card transaction",
+          "recoverability": 45,
+          "riskScore": 45,
+          "recommendedAction": "WhatsApp Reminder",
+          "confidence": 52,
+          "mlPrediction": {
+            "mlAvailable": true,
+            "recoverability": {
+              "prediction": "not_recoverable",
+              "probability": 0.4536
+            },
+            "riskScore": {
+              "prediction": 45
+            },
+            "action": {
+              "prediction": "WhatsApp Reminder",
+              "confidence": 0.52,
+              "probabilities": {
+                "Card Update Request": 0.0241,
+                "Email Reminder": 0.011,
+                "Human Escalation": 0.3469,
+                "No Action": 0.0743,
+                "Payment Link": 0.0174,
+                "Smart Retry": 0.007,
+                "UPI Fallback": 0.0019,
+                "WhatsApp Reminder": 0.5174
+              }
+            },
+            "reasoning": [
+              "Low recovery potential (45% probability)",
+              "Moderate risk score",
+              "May benefit from alternative payment method",
+              "ML confidence in action: 52%"
+            ]
+          }
+        }
+      },
+      "decide": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:47:09.108Z",
+        "result": {
+          "aiRecommendation": "WhatsApp Reminder",
+          "finalAction": "WhatsApp Reminder",
+          "reason": "Customer engagement via WhatsApp to recover payment",
+          "recoverability": 45,
+          "riskScore": 45,
+          "confidence": 0.52,
+          "mlAction": "WhatsApp Reminder"
+        }
+      },
+      "policy": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:47:09.110Z",
+        "result": {
+          "passed": true,
+          "allowedAction": "WhatsApp Reminder",
+          "requiresApproval": false,
+          "message": "Policy check passed"
+        }
+      },
+      "execute": {
+        "status": "COMPLETED",
+        "result": {
+          "status": "NOT_SUPPORTED",
+          "action": "WhatsApp Reminder",
+          "reason": "Action not supported for automatic execution"
+        },
+        "timestamp": "2026-09-04T15:47:09.111Z"
+      },
+      "recover": {
+        "status": "PENDING"
+      },
+      "audit": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T15:47:09.111Z",
+        "result": {
+          "agentRunId": "AGENT-1788536829102-6v5u7",
+          "transactionId": "DEMO-1788536584068",
+          "aiRecommendation": "WhatsApp Reminder",
+          "policyResult": "APPROVED",
+          "finalAction": "WhatsApp Reminder",
+          "executionStatus": "NOT_SUPPORTED",
+          "recoveryStatus": "NOT_SUPPORTED"
+        }
+      }
+    },
+    "startedAt": "2026-09-04T15:47:09.102Z",
+    "completedAt": "2026-09-04T15:47:09.111Z"
+  },
+  {
+    "agentRunId": "AGENT-1788537958598-ptez7",
+    "transactionId": "DEMO-1788537664633",
+    "source": "demo",
+    "status": "COMPLETED",
+    "currentStage": "AUDIT",
+    "stages": {
+      "detect": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T16:05:58.600Z",
+        "result": {
+          "transactionId": "DEMO-1788537664633",
+          "source": "demo",
+          "amount": 4000,
+          "type": "Failed Payment",
+          "failureReason": "Card Declined"
+        }
+      },
+      "diagnose": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T16:05:58.604Z",
+        "result": {
+          "problem": "Payment failed due to card declined",
+          "rootCause": "Issuing bank declined the card transaction",
+          "recoverability": 4,
+          "riskScore": 57,
+          "recommendedAction": "Human Escalation",
+          "confidence": 40,
+          "mlPrediction": {
+            "mlAvailable": true,
+            "recoverability": {
+              "prediction": "not_recoverable",
+              "probability": 0.039
+            },
+            "riskScore": {
+              "prediction": 57
+            },
+            "action": {
+              "prediction": "Human Escalation",
+              "confidence": 0.4,
+              "probabilities": {
+                "Card Update Request": 0.0432,
+                "Email Reminder": 0.0157,
+                "Human Escalation": 0.4043,
+                "No Action": 0.3855,
+                "Payment Link": 0.0298,
+                "Smart Retry": 0.0058,
+                "UPI Fallback": 0.0146,
+                "WhatsApp Reminder": 0.1012
+              }
+            },
+            "reasoning": [
+              "Low recovery potential (4% probability)",
+              "Moderate risk score",
+              "May benefit from alternative payment method",
+              "ML confidence in action: 40%"
+            ]
+          }
+        }
+      },
+      "decide": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T16:05:58.609Z",
+        "result": {
+          "aiRecommendation": "Human Escalation",
+          "finalAction": "Human Escalation",
+          "reason": "ML confidence too low for automated action or guardrail blocked automatic recovery",
+          "recoverability": 4,
+          "riskScore": 57,
+          "confidence": 0.4,
+          "mlAction": "Human Escalation"
+        }
+      },
+      "policy": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T16:05:58.615Z",
+        "result": {
+          "passed": true,
+          "allowedAction": "Human Escalation",
+          "requiresApproval": false,
+          "message": "Policy check passed"
+        }
+      },
+      "execute": {
+        "status": "COMPLETED",
+        "result": {
+          "status": "NOT_SUPPORTED",
+          "action": "Human Escalation",
+          "reason": "Action not supported for automatic execution"
+        },
+        "timestamp": "2026-09-04T16:05:58.616Z"
+      },
+      "recover": {
+        "status": "PENDING"
+      },
+      "audit": {
+        "status": "COMPLETED",
+        "timestamp": "2026-09-04T16:05:58.617Z",
+        "result": {
+          "agentRunId": "AGENT-1788537958598-ptez7",
+          "transactionId": "DEMO-1788537664633",
+          "aiRecommendation": "Human Escalation",
+          "policyResult": "APPROVED",
+          "finalAction": "Human Escalation",
+          "executionStatus": "NOT_SUPPORTED",
+          "recoveryStatus": "NOT_SUPPORTED"
+        }
+      }
+    },
+    "startedAt": "2026-09-04T16:05:58.598Z",
+    "completedAt": "2026-09-04T16:05:58.617Z"
   }
 ]
